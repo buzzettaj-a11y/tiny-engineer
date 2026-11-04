@@ -15,7 +15,8 @@ enum class AnimationId {
   Wakeup,
   Sleep,
   Dead,
-  Talking
+  Talking,
+  Listening
 };
 
 void setAnimation(AnimationId id);

@@ -8,6 +8,7 @@
 #include "display/eyes/core/util.h"
 #include "display/oled.h"
 #include "display/oled_internal.h"
+#include "display/eyes/core/draw.h"
 #include "pins.h"
 
 namespace {
@@ -83,7 +84,7 @@ void drawCover(
   display.clearDisplay();
 
   if (mode == EyeMode::Dead && deadShowingX()) {
-    display.display();
+    presentEyesFrame();
     return;
   }
 
@@ -92,7 +93,7 @@ void drawCover(
     kHalfWidth,
     eyes::renderEye(rightEye(), blinkOpenAmount())
   );
-  display.display();
+  presentEyesFrame();
 }
 
 }  // namespace

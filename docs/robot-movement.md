@@ -16,6 +16,14 @@ Animations author poses in **−1..1** relative to each joint’s saved min/max 
 
 **Head** tilts the face toward or away from the laptop. **Neck** pans the head side to side. **Hands** lift and lower over the keyboard; the forearms have no elbow servo — the arm linkage is fixed, so only the hand joint moves. **Left** and **right** hand servos use opposite scales: on the left, higher angle is down; on the right, higher angle is up (rest pose for typing is left at `max`, right at `min` — both over the keyboard). Setup AP guided calibration sets those keyboard bounds first, then the upper bounds. **Body** rotates the whole upper body in the chair while the base stays put.
 
+## Saved, soft and hard limits
+
+- **Saved** — the NVS calibration above; poses map onto it.
+- **Hard** — compile-time caps `SERVO_HARD_MIN_DEG` / `SERVO_HARD_MAX_DEG` in [`include/servos.h`](../include/servos.h): **10°–170°** on every joint, inside the 0–180° electrical clamp. Runtime code never goes past them; a saved range wider than that (possible from the setup wizard) is clamped at runtime.
+- **Soft** — RAM-only limits that start equal to saved (clamped into hard). With the optional INA219 current sensor, a bump narrows the soft limit on the side the joint was travelling. Animations, `POST /pose` and `POST /test/servo` clamp to the soft limits. `POST /bumps/clear`, `POST /ranges` and a reboot reset them.
+
+`POST /ranges` saves a new calibration outside setup mode (inside the hard caps, span ≥ 6°) and `POST /ranges/explore` probes one joint toward its hard cap until it bumps — [api.md](api.md#get-ranges).
+
 Command a single joint for bench checks:
 
 ```bash

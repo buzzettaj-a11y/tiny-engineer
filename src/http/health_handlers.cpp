@@ -6,6 +6,8 @@
 #include "hardware/chip_temp.h"
 #include "http/handlers.h"
 #include "http/response.h"
+#include "mic/mic.h"
+#include "motion/reflex.h"
 #include "network/wifi_connect.h"
 #include "settings/settings.h"
 
@@ -51,5 +53,21 @@ void handleHealth(WebServer& server) {
   body["setup_ap_ssid"] = provisioning ? wifiApSsid() : "";
   body["setup_ap_ip"] = provisioning ? wifiApIpText() : "";
   body["oled"] = oledAvailable;
+
+  const MicStatus mic = micStatus();
+  JsonObject micJson = body["mic"].to<JsonObject>();
+  micJson["present"] = mic.present;
+  micJson["muted"] = mic.muted;
+  micJson["streaming"] = mic.streaming;
+
+  float currentMa = 0.0f;
+
+  if (motionCurrentMa(currentMa)) {
+    body["current_ma"] = roundf(currentMa * 10.0f) / 10.0f;
+  } else {
+    body["current_ma"] = nullptr;
+  }
+
+  body["bumps"] = motionBumps().size();
   sendJson(server, 200, body);
 }

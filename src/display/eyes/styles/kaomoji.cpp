@@ -6,6 +6,7 @@
 
 #include "display/oled.h"
 #include "display/oled_internal.h"
+#include "display/eyes/core/draw.h"
 
 namespace {
 
@@ -38,6 +39,7 @@ expressions::Expression expressionFor(
       return expressions::Expression::Thinking;
     case EyeMode::Reading:
     case EyeMode::Attention:
+    case EyeMode::Listening:
       return expressions::Expression::Curious;
     case EyeMode::Ring:
       return expressions::Expression::Surprise;
@@ -95,7 +97,7 @@ void drawKaomoji(
     expressions::kHeight,
     SSD1306_WHITE
   );
-  display.display();
+  presentEyesFrame();
 }
 
 }  // namespace

@@ -65,6 +65,7 @@ Your agent (or a hook script) sends poses over **Wi‑Fi HTTP** or **USB serial*
 
 - **Default** — [`npx -y tiny-engineer`](https://www.npmjs.com/package/tiny-engineer) (`setup` / `hook`) for Cursor, Claude Code, Antigravity (HTTP or `--transport serial`)
 - **Advanced** — `POST /anim` ([HTTP API](docs/api.md)) or framed USB serial ([serial.md](docs/serial.md))
+- **Optional ears and touch** — an INMP441 mic (GP6), a mute button (GP7) and an INA219 current sensor (`0x41`) let the robot stream its mic to a home-PC brain and back off when a joint bumps into something: `GET`/`POST /mic`, `POST /pose`, `GET`/`POST /ranges`, `POST /ranges/explore`, `POST /bumps/clear`, the `listening` animation, and the `brain_host` / `brain_port` / `bump_threshold_ma` / `mic_shift` settings ([HTTP API](docs/api.md#get-mic) · [protocol](chip/PROTOCOL.md)). Without those parts the robot behaves as before
 
 Details: [Integrations](docs/integration.md) · [HTTP API](docs/api.md) · [USB serial](docs/serial.md) · [Cursor hooks](docs/hooks.md)
 

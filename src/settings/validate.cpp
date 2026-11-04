@@ -142,6 +142,50 @@ bool settingsValidateRgbOrder(const char* rgbOrder) {
          strcmp(rgbOrder, "BGR") == 0;
 }
 
+bool settingsValidateBrainHost(const char* brainHost) {
+  if (brainHost == nullptr) {
+    return false;
+  }
+
+  const size_t len = strlen(brainHost);
+
+  if (len > SETTINGS_BRAIN_HOST_MAX_LEN) {
+    return false;
+  }
+
+  if (len > 0 && (brainHost[0] == '-' || brainHost[0] == '.' || brainHost[len - 1] == '-')) {
+    return false;
+  }
+
+  for (size_t i = 0; i < len; i++) {
+    const char c = brainHost[i];
+    const bool ok =
+      (c >= 'a' && c <= 'z') ||
+      (c >= 'A' && c <= 'Z') ||
+      (c >= '0' && c <= '9') ||
+      c == '-' ||
+      c == '.';
+
+    if (!ok) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool settingsValidateBrainPort(uint32_t brainPort) {
+  return brainPort >= 1 && brainPort <= 65535;
+}
+
+bool settingsValidateBumpThreshold(uint32_t bumpThresholdMa) {
+  return bumpThresholdMa <= SETTINGS_BUMP_THRESHOLD_MAX_MA;
+}
+
+bool settingsValidateMicShift(uint32_t micShift) {
+  return micShift >= SETTINGS_MIC_SHIFT_MIN && micShift <= SETTINGS_MIC_SHIFT_MAX;
+}
+
 const char* SettingsPatch::invalidField() const {
   if (sleepTimeoutMin && !settingsValidateSleepTimeout(*sleepTimeoutMin)) {
     return "sleep_timeout";
@@ -182,6 +226,22 @@ const char* SettingsPatch::invalidField() const {
 
   if (rgbOrder != nullptr && !settingsValidateRgbOrder(rgbOrder)) {
     return "rgb_order";
+  }
+
+  if (brainHost != nullptr && !settingsValidateBrainHost(brainHost)) {
+    return "brain_host";
+  }
+
+  if (brainPort && !settingsValidateBrainPort(*brainPort)) {
+    return "brain_port";
+  }
+
+  if (bumpThresholdMa && !settingsValidateBumpThreshold(*bumpThresholdMa)) {
+    return "bump_threshold_ma";
+  }
+
+  if (micShift && !settingsValidateMicShift(*micShift)) {
+    return "mic_shift";
   }
 
   return nullptr;

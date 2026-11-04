@@ -10,9 +10,14 @@ public:
   explicit ServoWrapper(int index);
 
   float angle() const;
+  // Where the joint is heading (== angle() when still).
+  float target() const;
   bool moveTo(float target);
   bool moveToElectrical(float target, float speedDegS);
   void snapTo(float angle);
+  // POST /ranges/explore only: writes `angle` clamped to the hard caps
+  // (SERVO_HARD_*_DEG), past the soft limits. Joint stops there.
+  void driveHardClamped(float angle);
 
   void setTarget(
     float target,
@@ -73,9 +78,13 @@ void releaseAllServoOutputs();
 bool flushServoPoseToNvs();
 void pollServoPoseSave();
 void setServoParkHoldUntilReboot(bool hold);
+// millis() when a released PWM output was last switched back on (or boot).
+// A limp joint that drooped snaps back then, drawing a short current spike.
+uint32_t servoOutputsLastWakeMs();
 bool servoOutputsHoldActive();
 
 float clampElectricalAngle(float angle);
+// Clamps to the joint's soft limits (motion/reflex.h).
 float clampServoAngle(int index, float angle);
 float servoRuntimeMid(int index);
 float servoNormToDeg(int index, float n);

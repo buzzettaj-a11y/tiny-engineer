@@ -15,31 +15,39 @@ Shared bus.
 | --- | --- | --- |
 | PCA9685 | **`0x40`** | Hard fail: hang, 1 red blink (see [blink codes](testing.md#boot-failure-blink-codes)) |
 | SSD1306 OLED | **`0x3C`** | Soft fail: tests continue without display |
+| INA219 (optional) | **`0x41`** (A0 bridged) | Soft: current sensing and the bump reflex stay off; `current_ma` is `null` |
 
 Bus start: `Wire.begin(I2C_SDA, I2C_SCL)` with no explicit frequency → Arduino-ESP32 default (typically **100 kHz**). Not set in this repo.
 
-PCA9685 **VCC** = **3V3**. OLED **VCC** = **3V3**. Pull-ups are on the main control board and on a typical OLED; the Adafruit PCA9685 breakout has its own. No extra pull-ups.
+PCA9685 **VCC** = **3V3**. OLED **VCC** = **3V3**. INA219 **VCC** = **3V3**. Pull-ups are on the main control board and on a typical OLED; the Adafruit PCA9685 breakout has its own. No extra pull-ups.
+
+### INA219 current sensor (optional)
+
+Measures the servo rail: **VIN+ → VIN−** in series with the 5 V lead to the PCA9685 **V+** screw terminal. Firmware assumes the stock **0.1 Ω** shunt and configures PGA /8 (±320 mV = ±3.2 A), 12-bit shunt conversions averaged ×8 (4.26 ms), shunt-only continuous mode. It reads the shunt-voltage register (10 µV/LSB = 0.1 mA) every loop tick (at most every 5 ms), checks the config once a second and rewrites it after a brownout reset. Raw register access in [`src/hardware/ina219.cpp`](../../src/hardware/ina219.cpp); no library.
 
 ## I2S
 
-Device: **MAX98357A** (mono class-D). No MCLK wire.
+Devices: **MAX98357A** (mono class-D, speaker out) and an optional **INMP441** (mic in), full duplex on one I2S controller with shared BCLK/WS. No MCLK wire.
 
-| Signal | ESP32 GPIO | Amp pin (as drawn) |
-| --- | --- | --- |
-| BCLK | GPIO2 / GP2 | BCLK |
-| WS / LRC | GPIO3 / GP3 | LRC |
-| DATA | GPIO4 / GP4 | DIN |
+| Signal | ESP32 GPIO | Amp pin (as drawn) | INMP441 pin |
+| --- | --- | --- | --- |
+| BCLK | GPIO2 / GP2 | BCLK | SCK |
+| WS / LRC | GPIO3 / GP3 | LRC | WS |
+| DATA OUT | GPIO4 / GP4 | DIN | — |
+| DATA IN | GPIO6 / GP6 | — | SD |
+| — | — | — | L/R → **GND** (left slot) |
+| — | — | — | VDD → **3V3** (never 5 V), GND → GND |
 
-Bring-up configuration in [`src/main.cpp`](../../src/main.cpp):
+Bring-up configuration in [`src/audio/audio.cpp`](../../src/audio/audio.cpp) (`initI2sBus()`):
 
 | Parameter | Value |
 | --- | --- |
-| Mode | `I2S_MODE_STD` |
+| Mode | `I2S_MODE_STD` (Philips), TX + RX channels on one port (`setPins(BCLK, WS, DOUT, DIN)`) |
 | Sample rate | **22050** (`SAMPLE_RATE`) |
-| Width | `I2S_DATA_BIT_WIDTH_16BIT` |
+| Width | `I2S_DATA_BIT_WIDTH_32BIT` (64 BCLK per frame, as the INMP441 needs; BCLK ≈ 1.41 MHz) |
 | Slots | `I2S_SLOT_MODE_STEREO` |
 
-Firmware writes identical samples to both stereo slots. MAX98357A is mono. On the main control board, gain is the solder jumper next to the amplifier ([board README](../../hardware/boards/main-control-board/README.md)). On the advanced breakout, **GAIN** and **SD** stay unwired (GAIN floating ≈ 9 dB, SD pulled up ≈ left channel) — [wiring.md](wiring.md).
+Firmware writes identical samples to both stereo slots, each 16-bit sample in the top half of its 32-bit slot (volume scaling unchanged). The mic sends 24-bit samples MSB-aligned in the left 32-bit slot; the mic task converts them with `mic_shift` and streams them over UDP ([api.md](../api.md#mic-stream-udp)). GP6 has the internal pull-down on, so a missing mic reads silence. MAX98357A is mono. On the main control board, gain is the solder jumper next to the amplifier ([board README](../../hardware/boards/main-control-board/README.md)). On the advanced breakout, **GAIN** and **SD** stay unwired (GAIN floating ≈ 9 dB, SD pulled up ≈ left channel) — [wiring.md](wiring.md).
 
 On the main control board, amp **Vin** is **AUDIO_5V** (net-tied from **SERVO_5V** after the eFuse), not raw USB **+5V** — [power.md](power.md). On the advanced breakout, amp **Vin** is the shared USB **5V** rail — [wiring.md](wiring.md). I2S wires are 3.3 V logic. Speaker connects to **SPK+** / **SPK−** — [main-control-board.md](main-control-board.md).
 
@@ -88,4 +96,8 @@ C3-Zero has **no** USB–UART bridge. If CDC does not enumerate, hold **BOOT (GP
 | --- | --- | --- |
 | UART0 | GPIO21 TX / GPIO20 RX | Silkscreen; console is USB CDC |
 | BLE | antenna | Hardware may be present; **out of scope** — product uses Wi-Fi only |
+
+## Mic mute button (optional)
+
+Momentary switch from **GP7** to **GND**. `INPUT_PULLUP`, active LOW, 30 ms debounce, each press toggles mute (saved in NVS). Nothing on GP7 = never muted by the button.
 | ESP32 onboard USB-C | — | Unused when the board USB-C supplies power + data |

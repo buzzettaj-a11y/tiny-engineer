@@ -23,8 +23,10 @@ Stock flash: **[Web flash](https://jamro.github.io/tiny-engineer/flash/)**. Buil
 | I2C init | `Wire.begin` on GPIO0/GPIO1 |
 | PCA9685 | Probe `0x40` early; OE HIGH during init, restore last pose (or mid), then OE LOW (`PCA9685_OE_WIRED`) |
 | OLED | Probe `0x3C`, init (optional) |
+| INA219 (optional) | Probe `0x41`, configure (PGA /8, 0.1 Ω shunt, ~3.2 A); absent = bump reflex off |
 | Wi-Fi | STA connect from saved NVS credentials, or setup AP `TinyEngineer-XXXX` when unset/failed; mDNS `{hostname}.local` after STA connect |
-| MAX98357A / I2S | `I2S.begin` 22.05 kHz 16-bit stereo |
+| MAX98357A / I2S | `I2S.begin` 22.05 kHz, 32-bit stereo slots, full duplex (TX GP4 to the amp, RX GP6 from the optional INMP441 mic); speaker samples sit in the top 16 bits of each slot |
+| Mic (optional) | Mute state from NVS, GP7 button (`INPUT_PULLUP`), mic stream task; streams only with Wi-Fi and `brain_host` set |
 | Servos | Smooth move to mid (or sleep pose) at 35°/s |
 | HTTP | Port 80 when STA connected, or on setup AP at `192.168.4.1` |
 | Success | Dim green RGB during init; then animation LED (see below) |
@@ -50,12 +52,12 @@ code remains the no-cable signal.
 1. Serial banner `TINY ENGINEER`, then the firmware version string (`v0.1.0`, or a `git describe` form such as `v0.1.0-82-g7c79b83`)
 2. `Starting I2C` / `SDA = GP0` / `SCL = GP1`
 3. `Checking PCA9685 at 0x40...` → **must** succeed; all channels parked at mid
-4. `Checking OLED at 0x3C...` → found or `ERROR: OLED not found` (continues)
+4. `Checking OLED at 0x3C...` → found or `ERROR: OLED not found` (continues); then `Checking INA219 at 0x41...` → `INA219 OK` or `INA219 not found; bump reflex off` (continues)
 5. Settings load from NVS (`loading` = `progress` or `sleep_inertia`)
 6. **Progress loading (default):** OLED progress steps (Display → WiFi → Servos → Audio → Storage → Ready), then large full-width IP (or `No IP`) for 3 s, then idle eyes
 7. **Sleep inertia loading:** wakeup frame 0 during init (classic: closed lids; cover: black halves; kaomoji: Sleepy; dots: no circles). Smooth move to sleep pose if `welcome` is on. After init, wake plays from t=0: slow eye open + blinks (~5.5 s). Head/neck wave only if `welcome` is on; otherwise eyes only
 8. `WIFI SETUP` on serial — connect OK + IP, open setup AP, or saved credentials failed (setup AP for reconfiguration)
-9. `Starting MAX98357A` → `I2S OK`
+9. `Starting MAX98357A + mic (I2S full duplex)` → `I2S OK` → `[mic] muted=…`, `[mic] task started` (and later `[mic] INMP441 data seen` when a mic is fitted)
 10. `Centering servos` — smooth move to per-channel mid (progress path only; skipped if sleep pose already applied)
 11. `ROBOT READY`
 12. RGB fades to white over 1 s if `welcome` runs (Wi-Fi OK and setting enabled), or fades off if idle
@@ -73,7 +75,7 @@ During normal operation the onboard WS2812 tracks the active animation (not boot
 | `typing`, `reading`, `thinking`, `talking`, `welcome`, `ring`, `wakeup` | White |
 | `attention`, `error`, `dead` | Pulsing red (10%↔100%, 1.5 s cycle) |
 | `abort` | Solid red |
-| `none`, `sleep` | Off |
+| `none`, `sleep`, `listening` | Off (dim amber while the mic is muted) |
 
 State changes fade over **1 s** (see [`docs/api.md`](../api.md#rgb-led)). Trigger via `POST /anim?name=…` or agent hooks / CLIs.
 
@@ -112,7 +114,12 @@ curl -X POST "http://tiny-engineer.local/test/servo" -H "Content-Type: applicati
 | `GET` | `/health` | Health JSON — full field list in [api.md](../api.md#get-health) |
 | `GET` / `POST` | `/anim` | Current animation / start one (`name`, optional `interrupt`) — full params in [api.md](../api.md#post-anim) |
 | `POST` | `/play` | Stream a WAV while `talking` (or `/play/{name}`) runs; answers when the clip ends — full params in [api.md](../api.md#post-play) |
-| `GET` | `/settings` | Persistent settings (`sleep_timeout`, `hostname`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `loading`, `eyes_style`, `access_token_set`, `wifi_configured`, `servo_mins`, `servo_maxs`, `rgb_order`, `oled_rotate_180`, `wifi_networks`) |
+| `GET` / `POST` | `/mic` | Mic state (`muted`, `streaming`, `present`, `level`) / mute with `{"muted":true}` — [api.md](../api.md#get-mic) |
+| `POST` | `/pose` `{"pose":[5 × -1..1 or null],"ms"}` | Eased free-form move in `none`, clamped to the soft limits — [api.md](../api.md#post-pose) |
+| `GET` / `POST` | `/ranges` | Saved / soft / hard servo limits, current and bump log / save calibration outside setup `{"servo_mins","servo_maxs"}` — [api.md](../api.md#get-ranges) |
+| `POST` | `/ranges/explore` `{"joint","dir","speed"}` | Blocking probe of one joint toward its hard cap until a bump; needs the INA219 (`409` without) — [api.md](../api.md#post-rangesexplore) |
+| `POST` | `/bumps/clear` | Empty the bump log, soft limits back to saved |
+| `GET` | `/settings` | Persistent settings (`sleep_timeout`, `hostname`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `loading`, `eyes_style`, `access_token_set`, `wifi_configured`, `servo_mins`, `servo_maxs`, `rgb_order`, `oled_rotate_180`, `brain_host`, `brain_port`, `bump_threshold_ma`, `mic_shift`, `wifi_networks`) |
 | `POST` | `/settings` | Update NVS settings from a JSON object; the reply carries `reboot_required`, true once `hostname`, `loading` or the WiFi networks differ from what the robot booted with. `servo_mins` / `servo_maxs` (integer arrays), `rgb_order` and `oled_rotate_180` (boolean) are setup-AP-only |
 | `PUT` | `/settings/wifi` | Replace the saved WiFi networks (JSON array of 1 to 5); first one tested in setup AP mode |
 | `POST` | `/settings/reset` | Factory reset settings to defaults (clears WiFi, keeps servo ranges, RGB mapping, and screen rotation); power-cycle to reopen setup AP |
@@ -128,7 +135,7 @@ curl -X POST "http://tiny-engineer.local/test/servo" -H "Content-Type: applicati
 | `POST` | `/setup/audio` | Setup AP only; play `welcome.wav` (`playWelcome()`) |
 | `POST` | `/setup/oled` `{"rotate_180":true}` / `false` | Setup AP only; preview OLED 180° rotation (`THIS WAY UP`); an empty body restores the provisioning text |
 
-GET on a test path returns `405`. A bad JSON body or field on `/test/servo`, `/setup/*`, or `/settings` returns `400`. Missing/wrong Bearer when auth enabled returns `401`. Control APIs return `503` when WiFi credentials are not saved (`/setup/servo`, `/setup/led`, `/setup/audio`, and `/setup/oled` stay available). Unknown path returns `404`. JSON `Content-Type`. Handlers block until the test finishes; the OLED returns to `ROBOT READY` after.
+GET on a test path returns `405`. A bad JSON body or field on `/test/servo`, `/setup/*`, `/settings`, `/mic`, `/pose`, `/ranges`, or `/ranges/explore` returns `400`. Missing/wrong Bearer when auth enabled returns `401`. Control APIs return `503` when WiFi credentials are not saved (`/setup/servo`, `/setup/led`, `/setup/audio`, and `/setup/oled` stay available). Unknown path returns `404`. JSON `Content-Type`. Handlers block until the test finishes; the OLED returns to `ROBOT READY` after.
 
 HTTP runs on STA when connected, or on setup AP at `192.168.4.1` during provisioning.
 
@@ -145,6 +152,11 @@ HTTP runs on STA when connected, or on setup AP at `192.168.4.1` during provisio
 | I2S OK but `POST /test/audio` is silent | Amp or speaker | MAX98357A **Vin**=USB 5V, GND, GP2/3/4 → BCLK/LRC/DIN, speaker on **SPK+ / SPK-** (not on the PNG, not GND) |
 | Servos silent / twitch / ESP32 resets during `POST /test/movement` | Power or SIG | **V+** is +5V, SIG on ch 0–4, **common GND**, supply current — see [power.md](power.md) |
 | RGB never goes green | GPIO10 LED path | Board is C3-Zero (LED on GPIO10). Do not expect an external NeoPixel |
+| `I2S full duplex failed; retrying speaker only (mic off)` | The driver refused TX+RX on one port | Speaker still works; mic stream off. Report it with the serial log |
+| `/mic` `present` stays `false` with a mic fitted | No INMP441 data on GP6 | INMP441 **VDD=3V3** (never 5 V), GND, **L/R to GND** (left slot), SCK→GP2, WS→GP3, SD→GP6; `GET /mic` `level` moves when you talk |
+| `/mic` `streaming` stays `false` | Not muted, but nothing sent | `brain_host` set (`GET /settings`), Wi-Fi STA connected, host resolvable from the robot (try an IPv4 literal) |
+| `/ranges` `sensor` is `false` | No ACK at `0x41` | INA219 A0 jumper bridged (0x41; PCA9685 owns 0x40), VCC=3V3, SDA/SCL on GP0/GP1 |
+| Bumps on every move / never | Threshold vs this robot's servo current | Watch `current_ma` in `GET /ranges` while an animation runs; tune `bump_threshold_ma` |
 
 OLED absence and Wi-Fi failure are **soft** fails. PCA9685 and I2S failures **halt** in `while (true)`.
 

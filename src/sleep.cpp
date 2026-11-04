@@ -67,6 +67,22 @@ void noteActivity(uint32_t now) {
   g_idleSinceMs = now;
 }
 
+void wakeForActivity(uint32_t now) {
+  noteActivity(now);
+
+  switch (g_state) {
+    case SleepState::Sleeping:
+      wakeFromSleep(now);
+      break;
+    case SleepState::Closing:
+      requestSleepEyeOpen(now);
+      g_state = SleepState::Opening;
+      break;
+    default:
+      break;
+  }
+}
+
 void onAnimationApplied(AnimationId id, uint32_t now) {
   if (id == AnimationId::None) {
     noteActivity(now);

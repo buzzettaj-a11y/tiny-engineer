@@ -6,14 +6,18 @@
 // PINOUT
 // =====================================================
 
-// I2C -> PCA9685 + OLED
+// I2C -> PCA9685 + OLED (+ optional INA219)
 constexpr int I2C_SDA = 0;   // GP0
 constexpr int I2C_SCL = 1;   // GP1
 
-// I2S -> MAX98357A
-constexpr int I2S_BCLK = 2;  // GP2
-constexpr int I2S_LRC  = 3;  // GP3
-constexpr int I2S_DIN  = 4;  // GP4
+// I2S -> MAX98357A (+ optional INMP441 mic, full duplex on the same BCLK/WS)
+constexpr int I2S_BCLK = 2;  // GP2, also INMP441 SCK
+constexpr int I2S_LRC  = 3;  // GP3, also INMP441 WS
+constexpr int I2S_DIN  = 4;  // GP4, ESP32 data out -> amp DIN
+constexpr int I2S_MIC_SD = 6;  // GP6, INMP441 SD -> ESP32 data in (L/R = GND: left slot)
+
+// Optional mic mute button: momentary to GND, INPUT_PULLUP, active LOW.
+constexpr int MIC_MUTE_BUTTON_PIN = 7;  // GP7
 
 // Built-in WS2812 RGB
 constexpr int RGB_LED_PIN = 10;
@@ -35,6 +39,10 @@ constexpr int SAMPLE_RATE = 22050;
 // =====================================================
 
 constexpr uint8_t PCA9685_ADDRESS = 0x40;
+
+// Optional INA219 servo-rail current sensor (A0 bridged). VIN+/VIN- in series
+// with the 5 V lead to the PCA9685 V+ terminal.
+constexpr uint8_t INA219_ADDRESS = 0x41;
 
 constexpr int SERVO_STEP_MS = 10;
 

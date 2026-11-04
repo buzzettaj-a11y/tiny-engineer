@@ -195,8 +195,87 @@ void test_link_mode_patch_denied_outside_setup() {
   );
 }
 
+void test_brain_host() {
+  TEST_ASSERT_FALSE(settingsValidateBrainHost(nullptr));
+  TEST_ASSERT_TRUE(settingsValidateBrainHost(""));
+  TEST_ASSERT_TRUE(settingsValidateBrainHost("192.168.1.20"));
+  TEST_ASSERT_TRUE(settingsValidateBrainHost("brain-pc.local"));
+  TEST_ASSERT_TRUE(settingsValidateBrainHost("Brain1"));
+  TEST_ASSERT_FALSE(settingsValidateBrainHost("brain pc"));
+  TEST_ASSERT_FALSE(settingsValidateBrainHost("http://brain"));
+  TEST_ASSERT_FALSE(settingsValidateBrainHost("brain:47100"));
+  TEST_ASSERT_FALSE(settingsValidateBrainHost("-brain"));
+  TEST_ASSERT_FALSE(settingsValidateBrainHost(".brain"));
+  TEST_ASSERT_FALSE(settingsValidateBrainHost("brain-"));
+
+  char longest[SETTINGS_BRAIN_HOST_MAX_LEN + 2];
+  memset(longest, 'a', sizeof(longest));
+  longest[SETTINGS_BRAIN_HOST_MAX_LEN] = '\0';
+  TEST_ASSERT_TRUE(settingsValidateBrainHost(longest));
+  longest[SETTINGS_BRAIN_HOST_MAX_LEN] = 'a';
+  longest[SETTINGS_BRAIN_HOST_MAX_LEN + 1] = '\0';
+  TEST_ASSERT_FALSE(settingsValidateBrainHost(longest));
+}
+
+void test_brain_port() {
+  TEST_ASSERT_FALSE(settingsValidateBrainPort(0));
+  TEST_ASSERT_TRUE(settingsValidateBrainPort(1));
+  TEST_ASSERT_TRUE(settingsValidateBrainPort(SETTINGS_DEFAULT_BRAIN_PORT));
+  TEST_ASSERT_TRUE(settingsValidateBrainPort(65535));
+  TEST_ASSERT_FALSE(settingsValidateBrainPort(65536));
+  TEST_ASSERT_EQUAL_UINT16(47100, SETTINGS_DEFAULT_BRAIN_PORT);
+}
+
+void test_bump_threshold() {
+  TEST_ASSERT_TRUE(settingsValidateBumpThreshold(0));
+  TEST_ASSERT_TRUE(settingsValidateBumpThreshold(650));
+  TEST_ASSERT_TRUE(settingsValidateBumpThreshold(3000));
+  TEST_ASSERT_FALSE(settingsValidateBumpThreshold(3001));
+  TEST_ASSERT_EQUAL_UINT16(650, SETTINGS_DEFAULT_BUMP_THRESHOLD_MA);
+}
+
+void test_mic_shift() {
+  TEST_ASSERT_FALSE(settingsValidateMicShift(7));
+  TEST_ASSERT_TRUE(settingsValidateMicShift(8));
+  TEST_ASSERT_TRUE(settingsValidateMicShift(14));
+  TEST_ASSERT_TRUE(settingsValidateMicShift(20));
+  TEST_ASSERT_FALSE(settingsValidateMicShift(21));
+  TEST_ASSERT_EQUAL_UINT8(14, SETTINGS_DEFAULT_MIC_SHIFT);
+}
+
+void test_patch_names_chip_fields() {
+  SettingsPatch ok;
+  ok.brainHost = "192.168.1.5";
+  ok.brainPort = 47100;
+  ok.bumpThresholdMa = 0;
+  ok.micShift = 12;
+  TEST_ASSERT_NULL(ok.invalidField());
+  TEST_ASSERT_NULL(ok.setupOnlyStep());
+
+  SettingsPatch host;
+  host.brainHost = "bad host";
+  TEST_ASSERT_EQUAL_STRING("brain_host", host.invalidField());
+
+  SettingsPatch port;
+  port.brainPort = 0;
+  TEST_ASSERT_EQUAL_STRING("brain_port", port.invalidField());
+
+  SettingsPatch bump;
+  bump.bumpThresholdMa = 3001;
+  TEST_ASSERT_EQUAL_STRING("bump_threshold_ma", bump.invalidField());
+
+  SettingsPatch shift;
+  shift.micShift = 21;
+  TEST_ASSERT_EQUAL_STRING("mic_shift", shift.invalidField());
+}
+
 int main() {
   UNITY_BEGIN();
+  RUN_TEST(test_brain_host);
+  RUN_TEST(test_brain_port);
+  RUN_TEST(test_bump_threshold);
+  RUN_TEST(test_mic_shift);
+  RUN_TEST(test_patch_names_chip_fields);
   RUN_TEST(test_hostname_rejects_invalid);
   RUN_TEST(test_hostname_accepts_valid);
   RUN_TEST(test_sleep_timeout);

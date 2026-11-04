@@ -8,9 +8,11 @@ Source of truth: [`include/pins.h`](../../include/pins.h). This file must match 
 | --- | --- | --- | --- |
 | I2C SDA | **GPIO0** (diagram **GP0**) | `I2C_SDA` | PCA9685 SDA, OLED SDA |
 | I2C SCL | **GPIO1** (diagram **GP1**) | `I2C_SCL` | PCA9685 SCL, Waveshare OLED **SCL** |
-| I2S BCLK | **GPIO2** (diagram **GP2**) | `I2S_BCLK` | MAX98357A BCLK |
-| I2S LRCLK / WS | **GPIO3** (diagram **GP3**) | `I2S_LRC` | MAX98357A **LRC** |
+| I2S BCLK | **GPIO2** (diagram **GP2**) | `I2S_BCLK` | MAX98357A BCLK; optional INMP441 **SCK** (shared) |
+| I2S LRCLK / WS | **GPIO3** (diagram **GP3**) | `I2S_LRC` | MAX98357A **LRC**; optional INMP441 **WS** (shared) |
 | I2S DATA OUT | **GPIO4** (diagram **GP4**) | `I2S_DIN` | MAX98357A DIN |
+| I2S DATA IN (optional) | **GPIO6** (diagram **GP6**) | `I2S_MIC_SD` | INMP441 **SD** (L/R tied to GND: left slot). Internal pull-down enabled |
+| Mic mute button (optional) | **GPIO7** (diagram **GP7**) | `MIC_MUTE_BUTTON_PIN` | Momentary switch to GND; `INPUT_PULLUP`, active LOW |
 | PCA9685 OE | **GPIO5** (diagram **GP5**) | `PCA9685_OE_PIN` | PCA9685 **OE** (active LOW; `PCA9685_OE_WIRED`) |
 | Built-in WS2812 RGB | **GPIO10** | `RGB_LED_PIN` | onboard LED only |
 
@@ -30,8 +32,6 @@ Logic level: **3.3 V**.
 
 | GPIO | Status | Notes |
 | --- | --- | --- |
-| GPIO6 | Free | Brought out on **J4** (main control board) |
-| GPIO7 | Free | Brought out on **J4** |
 | GPIO8 | Free | Brought out on **J4**; strapping — do not pull low at reset |
 | GPIO20 | Default UART0 RX | Silkscreen RX; also on **J4**. Free for other use only if USB CDC remains the console (`ARDUINO_USB_CDC_ON_BOOT=1`) |
 | GPIO21 | Default UART0 TX | Silkscreen TX; also on **J4**. Same caveat as GPIO20 |
@@ -75,11 +75,11 @@ Same bus as J2 / PCA9685. **Pin order is not the same as J2** (GND and 3.3 V are
 | 7 | **+3.3V** |
 | 8 | **GP8** (strapping — do not pull low at reset) |
 | 9 | **I2S BCLK** |
-| 10 | **GP7** |
+| 10 | **GP7** (optional mic mute button) |
 | 11 | **I2S LRC** |
-| 12 | **GP6** |
+| 12 | **GP6** (optional INMP441 SD) |
 
-I2S **DIN** is not on J4 (ESP32 → amp only). **SERVO_5V** is the eFuse-protected rail — [power.md](power.md).
+I2S **DIN** is not on J4 (ESP32 → amp only). The optional Chip parts plug into J4: INMP441 on pins 7 (3.3 V), 5 (GND), 9 (SCK), 11 (WS) and 12 (SD), the mute button between pin 10 and a GND pin. **SERVO_5V** is the eFuse-protected rail — [power.md](power.md).
 
 ## PCA9685 channels (not ESP32 GPIO)
 
@@ -96,8 +96,9 @@ I2S **DIN** is not on J4 (ESP32 → amp only). **SERVO_5V** is the eFuse-protect
 
 | Constant | Value | Meaning |
 | --- | --- | --- |
-| `SAMPLE_RATE` | 22050 | I2S sample rate |
+| `SAMPLE_RATE` | 22050 | I2S sample rate (32-bit stereo slots, full duplex) |
 | `PCA9685_ADDRESS` | `0x40` | I2C |
+| `INA219_ADDRESS` | `0x41` | I2C, optional servo-rail current sensor (A0 bridged) |
 | `OLED_ADDRESS` | `0x3C` | I2C |
 | `OLED_WIDTH` / `OLED_HEIGHT` | 128 / 32 | Display |
 | `SERVO_MIN_US` / `SERVO_MAX_US` | 800 / 2200 | Electrical PWM span |

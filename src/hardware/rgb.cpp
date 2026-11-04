@@ -5,6 +5,7 @@
 #include "network/wifi_connect.h"
 #include "pins.h"
 #include "hardware/rgb.h"
+#include "mic/mic.h"
 #include "serial_log.h"
 #include "settings/settings.h"
 
@@ -28,6 +29,11 @@ constexpr uint32_t RGB_PULSE_PHASE_MS = 500;
 constexpr uint32_t RGB_PULSE_CYCLE_MS = RGB_PULSE_PHASE_MS * 3;
 
 constexpr uint8_t RGB_PROVISIONING_B = 64;
+
+// Mic muted: dim amber wherever the animation would leave the LED off.
+constexpr uint8_t RGB_MUTED_R = 40;
+constexpr uint8_t RGB_MUTED_G = 14;
+constexpr uint8_t RGB_MUTED_B = 0;
 
 uint8_t g_startR = 0;
 uint8_t g_startG = 0;
@@ -132,6 +138,12 @@ void resolveAnimationTarget(AnimationId id, uint8_t& r, uint8_t& g, uint8_t& b) 
       g = 0;
       b = 0;
       break;
+  }
+
+  if (isOff(r, g, b) && micMuted()) {
+    r = RGB_MUTED_R;
+    g = RGB_MUTED_G;
+    b = RGB_MUTED_B;
   }
 }
 

@@ -32,3 +32,11 @@ void handleSetupAudio(WebServer& server);
 void handleSetupOled(WebServer& server);
 
 void handleServosPark(WebServer& server);
+
+void handleMicGet(WebServer& server);
+void handleMicPost(WebServer& server);
+void handlePosePost(WebServer& server);
+void handleRangesGet(WebServer& server);
+void handleRangesPost(WebServer& server);
+void handleRangesExplore(WebServer& server);
+void handleBumpsClear(WebServer& server);

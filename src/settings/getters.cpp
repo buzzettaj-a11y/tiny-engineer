@@ -90,3 +90,19 @@ const char* settingsRgbOrder() {
 bool settingsOledRotate180() {
   return g_settings.oledRotate180;
 }
+
+const char* settingsBrainHost() {
+  return g_settings.brainHost;
+}
+
+uint16_t settingsBrainPort() {
+  return g_settings.brainPort;
+}
+
+uint16_t settingsBumpThresholdMa() {
+  return g_settings.bumpThresholdMa;
+}
+
+uint8_t settingsMicShift() {
+  return g_settings.micShift;
+}

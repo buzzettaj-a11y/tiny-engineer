@@ -21,5 +21,9 @@ constexpr const char* kKeyServoRanges = "sranges";
 constexpr const char* kKeyRgbOrder = "rgb_ord";
 constexpr const char* kKeyOledRot = "oled_rot";
 constexpr const char* kKeyLinkMode = "link_mode";
+constexpr const char* kKeyBrainHost = "brain_host";
+constexpr const char* kKeyBrainPort = "brain_port";
+constexpr const char* kKeyBumpMa = "bump_ma";
+constexpr const char* kKeyMicShift = "mic_shift";
 
 extern Preferences g_settingsPrefs;

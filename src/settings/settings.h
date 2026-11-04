@@ -37,6 +37,16 @@ constexpr size_t SETTINGS_RGB_ORDER_MAX_LEN = 3;
 constexpr const char* SETTINGS_DEFAULT_RGB_ORDER = "GRB";
 constexpr bool SETTINGS_DEFAULT_OLED_ROTATE_180 = false;
 
+// Chip mic stream / bump reflex (chip/PROTOCOL.md). Empty brain_host = streaming off.
+constexpr const char* SETTINGS_DEFAULT_BRAIN_HOST = "";
+constexpr size_t SETTINGS_BRAIN_HOST_MAX_LEN = 63;
+constexpr uint16_t SETTINGS_DEFAULT_BRAIN_PORT = 47100;
+constexpr uint16_t SETTINGS_DEFAULT_BUMP_THRESHOLD_MA = 650;
+constexpr uint16_t SETTINGS_BUMP_THRESHOLD_MAX_MA = 3000;
+constexpr uint8_t SETTINGS_DEFAULT_MIC_SHIFT = 14;
+constexpr uint8_t SETTINGS_MIC_SHIFT_MIN = 8;
+constexpr uint8_t SETTINGS_MIC_SHIFT_MAX = 20;
+
 struct ServoRanges {
   uint8_t mins[SETTINGS_SERVO_COUNT];
   uint8_t maxs[SETTINGS_SERVO_COUNT];
@@ -60,6 +70,10 @@ struct SettingsPatch {
   std::optional<ServoRanges> servoRanges;
   const char* rgbOrder = nullptr;
   std::optional<bool> oledRotate180;
+  const char* brainHost = nullptr;
+  std::optional<uint16_t> brainPort;
+  std::optional<uint16_t> bumpThresholdMa;
+  std::optional<uint8_t> micShift;
 
   // API name of the first field set to an invalid value, or nullptr.
   const char* invalidField() const;
@@ -100,6 +114,10 @@ float settingsServoMin(int index);
 float settingsServoMax(int index);
 const char* settingsRgbOrder();
 bool settingsOledRotate180();
+const char* settingsBrainHost();
+uint16_t settingsBrainPort();
+uint16_t settingsBumpThresholdMa();
+uint8_t settingsMicShift();
 
 // True once the saved hostname, loading screen or WiFi networks differ from
 // what this boot started with; those apply only after a reboot.
@@ -115,6 +133,11 @@ bool settingsValidateAccessToken(const char* accessToken);
 bool settingsValidateWifiSsid(const char* wifiSsid);
 bool settingsValidateWifiPassword(const char* wifiPassword);
 bool settingsValidateRgbOrder(const char* rgbOrder);
+// Empty, or a hostname / IPv4 literal: 1–63 of [A-Za-z0-9.-].
+bool settingsValidateBrainHost(const char* brainHost);
+bool settingsValidateBrainPort(uint32_t brainPort);
+bool settingsValidateBumpThreshold(uint32_t bumpThresholdMa);
+bool settingsValidateMicShift(uint32_t micShift);
 
 // Saves the fields the patch sets and keeps the others. False when a field is
 // invalid (nothing is written) or NVS fails.

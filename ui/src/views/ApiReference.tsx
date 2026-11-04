@@ -30,6 +30,13 @@ const ROUTES = [
   ["POST", "/setup/audio", "Setup AP only: play welcome.wav from LittleFS"],
   ["POST", "/setup/oled", "Setup AP only: preview OLED 180° rotation (see parameters below)"],
   ["POST", "/servos/park", "Center all servos at mid and hold PWM until reboot"],
+  ["GET", "/mic", "Mic state: muted, streaming, present, level"],
+  ["POST", "/mic", "Mute or unmute the mic (see parameters below)"],
+  ["POST", "/pose", "Smooth free-form pose move (see parameters below)"],
+  ["GET", "/ranges", "Saved, soft and hard servo limits, current, bump log"],
+  ["POST", "/ranges", "Save servo calibration outside setup (see parameters below)"],
+  ["POST", "/ranges/explore", "Probe one joint toward its hard limit (see parameters below)"],
+  ["POST", "/bumps/clear", "Empty the bump log and reset soft limits to saved"],
 ] as const;
 
 export function ApiReference() {
@@ -191,6 +198,45 @@ export function ApiReference() {
               Setup AP only; default <code>false</code>
             </td>
           </tr>
+          <tr>
+            <td>
+              <code>brain_host</code>
+            </td>
+            <td>string</td>
+            <td>
+              0&ndash;63 chars, <code>[A-Za-z0-9.-]</code> (hostname or IPv4); empty turns the mic
+              stream off; default empty
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>brain_port</code>
+            </td>
+            <td>integer</td>
+            <td>
+              1&ndash;65535 (mic UDP port); default <code>47100</code>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>bump_threshold_ma</code>
+            </td>
+            <td>integer</td>
+            <td>
+              0&ndash;3000 mA over the idle baseline; <code>0</code> disables the bump reflex;
+              default <code>650</code>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>mic_shift</code>
+            </td>
+            <td>integer</td>
+            <td>
+              8&ndash;20; 16-bit sample = mic slot &gt;&gt; <code>mic_shift</code> (lower = louder);
+              default <code>14</code>
+            </td>
+          </tr>
         </tbody>
       </table>
       <p>
@@ -295,6 +341,12 @@ export function ApiReference() {
             </td>
             <td>Close eyes and sleep</td>
           </tr>
+          <tr>
+            <td>
+              <code>listening</code>
+            </td>
+            <td>Faces the user and holds still (no fidget); attentive eyes</td>
+          </tr>
         </tbody>
       </table>
       <p>
@@ -335,9 +387,141 @@ export function ApiReference() {
           </tr>
           <tr>
             <td>
+              <code>listening</code>
+            </td>
+            <td>Faces the user and holds still</td>
+          </tr>
+          <tr>
+            <td>
               <code>none</code>
             </td>
             <td>Idle pose</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        POST <code>/mic</code> &mdash; JSON body fields. The GP7 button toggles the same state:
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Range</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>muted</code>
+            </td>
+            <td>boolean</td>
+            <td>Required; saved to NVS</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        POST <code>/pose</code> &mdash; JSON body fields. Stops the animation (<code>none</code>),
+        clamps to the soft limits:
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Range</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>pose</code>
+            </td>
+            <td>array</td>
+            <td>
+              5 entries <code>[head, neck, left, right, body]</code>, each &minus;1&ndash;1 or{" "}
+              <code>null</code> (leave that joint)
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>ms</code>
+            </td>
+            <td>integer</td>
+            <td>
+              100&ndash;5000 (time to arrive, eased); default <code>600</code>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        POST <code>/ranges</code> &mdash; JSON body fields (both required):
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Range</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>servo_mins</code>
+            </td>
+            <td>number array</td>
+            <td>
+              5 degrees, rounded; each <code>hard_min</code> &le; min &lt; max
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>servo_maxs</code>
+            </td>
+            <td>number array</td>
+            <td>
+              5 degrees, rounded; each max &le; <code>hard_max</code>, span &ge; 6&deg;
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        POST <code>/ranges/explore</code> &mdash; blocking; needs the INA219. JSON body fields:
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Range</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>joint</code>
+            </td>
+            <td>integer</td>
+            <td>0&ndash;4</td>
+          </tr>
+          <tr>
+            <td>
+              <code>dir</code>
+            </td>
+            <td>string</td>
+            <td>
+              <code>min</code> or <code>max</code>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>speed</code>
+            </td>
+            <td>number</td>
+            <td>
+              5&ndash;30&deg;/s; default <code>10</code>
+            </td>
           </tr>
         </tbody>
       </table>

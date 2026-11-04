@@ -22,6 +22,10 @@ struct SettingsValues {
   ServoRanges servoRanges;
   char rgbOrder[SETTINGS_RGB_ORDER_MAX_LEN + 1];
   bool oledRotate180;
+  char brainHost[SETTINGS_BRAIN_HOST_MAX_LEN + 1];
+  uint16_t brainPort;
+  uint16_t bumpThresholdMa;
+  uint8_t micShift;
 
   static SettingsValues defaults();
 

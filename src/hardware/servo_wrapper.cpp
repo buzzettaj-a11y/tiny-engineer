@@ -8,6 +8,8 @@
 #include "pins.h"
 #include "servos.h"
 #include "hardware/servo_wrapper.h"
+#include "hardware/activity.h"
+#include "motion/reflex.h"
 #include "serial_log.h"
 #include "settings/settings.h"
 
@@ -25,6 +27,7 @@ static bool g_poseDirty = false;
 static uint32_t g_poseDirtySinceMs = 0;
 static uint8_t g_lastSavedPose[SERVO_COUNT] = {};
 static bool g_lastSavedPoseValid = false;
+static uint32_t g_lastOutputWakeMs = 0;
 
 ServoWrapper g_servos[SERVO_COUNT] = {
   ServoWrapper(SERVO_HEAD),
@@ -57,11 +60,8 @@ float clampServoAngle(int index, float angle) {
     return clampElectricalAngle(angle);
   }
 
-  return constrain(
-    angle,
-    settingsServoMin(index),
-    settingsServoMax(index)
-  );
+  // Soft limits: the saved range clamped to the hard caps, narrowed by bumps.
+  return servoSoftClamp(index, angle);
 }
 
 float clampAngle(int index, float angle, bool electrical) {
@@ -264,6 +264,11 @@ void initServoPwmDriver() {
 
   delay(10);
   enableServoOutputs();
+  g_lastOutputWakeMs = millis();
+}
+
+uint32_t servoOutputsLastWakeMs() {
+  return g_lastOutputWakeMs;
 }
 
 ServoWrapper& servoAt(int index) {
@@ -281,6 +286,17 @@ ServoWrapper::ServoWrapper(int index)
 
 float ServoWrapper::angle() const {
   return angle_;
+}
+
+float ServoWrapper::target() const {
+  return target_;
+}
+
+void ServoWrapper::driveHardClamped(float angle) {
+  angle = constrain(angle, SERVO_HARD_MIN_DEG[index_], SERVO_HARD_MAX_DEG[index_]);
+  writeAngle(angle, false, true);
+  target_ = angle_;
+  lastUpdateMs_ = 0;
 }
 
 void ServoWrapper::setTarget(float target, float speedDegS) {
@@ -401,6 +417,7 @@ void ServoWrapper::ensureServoOutput() {
   released_ = false;
   g_allOutputsReleased = false;
   lastPulse_ = UINT16_MAX;
+  g_lastOutputWakeMs = millis();
 
   const uint16_t pulse = angleToPulse(angle_);
   pwm.setPWM(
@@ -452,6 +469,7 @@ void ServoWrapper::writeAngle(float angle, bool log, bool electrical) {
       pulse
     );
     lastPulse_ = pulse;
+    activityNoteServoWrite(millis());
   }
 
   angle_ = angle;

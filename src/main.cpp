@@ -1,11 +1,12 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <ESP_I2S.h>
 
 #include "pins.h"
 #include "firmware_version.h"
 #include "hardware/rgb.h"
 #include "hardware/chip_temp.h"
+#include "hardware/ina219.h"
+#include "mic/mic.h"
 #include "display/oled.h"
 #include "audio/audio.h"
 #include "animation.h"
@@ -68,6 +69,9 @@ void setup() {
 
   initOled();
 
+  // Optional servo-rail current sensor; absent = bump reflex off.
+  initIna219();
+
   const bool sleepServos = bootSleepInertiaUsesServos();
 
   if (bootLoadingIsProgress()) {
@@ -93,21 +97,10 @@ void setup() {
 
   serialLogPrintln();
   serialLogPrintln(
-    "Starting MAX98357A"
+    "Starting MAX98357A + mic (I2S full duplex)"
   );
 
-  I2S.setPins(
-    I2S_BCLK,
-    I2S_LRC,
-    I2S_DIN
-  );
-
-  if (!I2S.begin(
-        I2S_MODE_STD,
-        SAMPLE_RATE,
-        I2S_DATA_BIT_WIDTH_16BIT,
-        I2S_SLOT_MODE_STEREO
-      )) {
+  if (!initI2sBus()) {
     serialLogPrintln(
       "ERROR: I2S initialization failed"
     );
@@ -121,6 +114,9 @@ void setup() {
   }
 
   serialLogPrintln("I2S OK");
+  // Mute state from NVS, GP7 button, and the mic stream task. Streams only once
+  // Wi-Fi is up and brain_host is set; a missing mic just reads silence.
+  initMic();
   bootShowProgress(4, kBootSteps, "Audio");
 
   initAudioStorage();

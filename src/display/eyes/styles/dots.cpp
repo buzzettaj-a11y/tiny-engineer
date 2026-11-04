@@ -118,7 +118,7 @@ void drawDots(
   display.clearDisplay();
   drawScaledDot(eyes::renderEye(leftEye(), blinkOpenAmount()));
   drawScaledDot(eyes::renderEye(rightEye(), blinkOpenAmount()));
-  display.display();
+  presentEyesFrame();
 }
 
 }  // namespace

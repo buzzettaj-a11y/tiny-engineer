@@ -145,6 +145,8 @@ ESP32-C3-Zero, unused in the PNG:
 
 **GP6, GP7, GP8, GP9, GP10, GP20, GP21**
 
+Optional Chip parts use two of them: **GP6** ← INMP441 **SD** (mic SCK/WS share GP2/GP3 with the amp, L/R to GND, VDD to 3V3) and **GP7** ← mute button to GND. An optional INA219 (A0 bridged, `0x41`) sits on the I2C bus with VIN+/VIN− in series with the 5 V lead to PCA9685 **V+** — [interfaces.md](interfaces.md).
+
 Wire **GP5** → PCA9685 **OE** (`PCA9685_OE_PIN`; active LOW). The base PNG may omit that wire — add it on the breadboard and on the Adafruit breakout OE pin. GP9 = BOOT, GP10 = onboard WS2812. GP18/GP19 = native USB — wire from 5993 D−/D+ even if the base PNG omits them. See [pinout.md](pinout.md).
 
 MAX98357A **GAIN** / **SD** not wired (breakout defaults). **SPK+** / **SPK-** not drawn.

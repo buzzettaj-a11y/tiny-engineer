@@ -5,6 +5,8 @@
 
 #include "display/oled.h"
 #include "display/oled_internal.h"
+#include "mic/mic.h"
+#include "pins.h"
 
 namespace {
 
@@ -104,7 +106,30 @@ void drawXInEye(const Eye& eye) {
   drawThickLine(x1, y0, x0, y1);
 }
 
+// Muted mic: a 7x9 microphone with a slash in the top-right corner, on a
+// black patch so it reads over any style (kaomoji faces fill the panel).
+void drawMuteMark() {
+  constexpr int16_t x = OLED_WIDTH - 9;
+  constexpr int16_t y = 0;
+
+  display.fillRect(x - 1, y, 10, 11, SSD1306_BLACK);
+  display.drawRoundRect(x + 2, y, 4, 6, 2, SSD1306_WHITE);          // capsule
+  display.drawLine(x + 1, y + 4, x + 1, y + 5, SSD1306_WHITE);      // cradle left
+  display.drawLine(x + 6, y + 4, x + 6, y + 5, SSD1306_WHITE);      // cradle right
+  display.drawLine(x + 2, y + 6, x + 5, y + 6, SSD1306_WHITE);      // cradle bottom
+  display.drawLine(x + 3, y + 7, x + 3, y + 8, SSD1306_WHITE);      // stand
+  display.drawLine(x, y + 9, x + 7, y, SSD1306_WHITE);              // slash
+}
+
 }  // namespace
+
+void presentEyesFrame() {
+  if (micMuted()) {
+    drawMuteMark();
+  }
+
+  display.display();
+}
 
 void drawEyes(
   const Eye& left,
@@ -118,7 +143,7 @@ void drawEyes(
   display.clearDisplay();
   fillRoundedEye(left, cornerRadius);
   fillRoundedEye(right, cornerRadius);
-  display.display();
+  presentEyesFrame();
 }
 
 void drawDeadXEyes(const Eye& left, const Eye& right) {
@@ -129,5 +154,5 @@ void drawDeadXEyes(const Eye& left, const Eye& right) {
   display.clearDisplay();
   drawXInEye(left);
   drawXInEye(right);
-  display.display();
+  presentEyesFrame();
 }

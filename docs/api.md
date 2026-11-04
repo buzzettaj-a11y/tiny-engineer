@@ -6,7 +6,7 @@ Listens on **port 80** after STA Wi-Fi connects, or during setup AP mode at `htt
 
 Optional auth: when an `access_token` is configured in settings, all JSON API routes require `Authorization: Bearer <token>`. Empty token (default) means no auth. `GET /auth` is always public and reports whether auth is required. Missing/wrong token → **401** `{"ok":false,"error":"unauthorized"}`. HTML panel routes stay public (the UI prompts for the token). Replies are `Content-Type: application/json`. Routes that take parameters (except `POST /anim` and `/play`) read a JSON object body sent with `Content-Type: application/json`; query parameters or form fields on those routes → **400** `send a JSON body with Content-Type: application/json`, and a body that is not a JSON object → **400** `body must be a JSON object`. CORS: requests with an `Origin` header get `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Headers: Authorization, Content-Type` and `Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS`; a preflight `OPTIONS` gets **200**.
 
-When the robot is not yet provisioned (no connection mode chosen), control APIs (`/anim`, `/test/*`, `/play`) return **503** `{"ok":false,"error":"not provisioned"}`. Setup routes (`/`, `/config`, `/auth`, `/health`, `/settings`, `/setup/servo`, `/setup/led`, `/setup/audio`, `/setup/oled`, `/servos/park`) stay available on the setup AP. Connection mode is `wifi` or `usb` (`link_mode` in settings/auth/health). USB-only mode disables Wi‑Fi station and the HTTP API after reboot; control then uses the USB serial protocol ([serial.md](serial.md)).
+When the robot is not yet provisioned (no connection mode chosen), control APIs (`/anim`, `/test/*`, `/play`, `/mic`, `/pose`, `/ranges`, `/ranges/explore`, `/bumps/clear`) return **503** `{"ok":false,"error":"not provisioned"}`. Setup routes (`/`, `/config`, `/auth`, `/health`, `/settings`, `/setup/servo`, `/setup/led`, `/setup/audio`, `/setup/oled`, `/servos/park`) stay available on the setup AP. Connection mode is `wifi` or `usb` (`link_mode` in settings/auth/health). USB-only mode disables Wi‑Fi station and the HTTP API after reboot; control then uses the USB serial protocol ([serial.md](serial.md)).
 
 If boot WiFi credentials are missing, the device opens setup AP mode (`TinyEngineer-XXXX`) and serves a five-step setup wizard at `/config` (servo hub: guided calibration / skip / assembly centering, then OLED orientation, RGB LED, speaker test, then connection). If saved credentials fail, it reopens setup AP mode. The setup AP acts as a captive portal: DHCP sends the portal URL (option 114) and DNS answers every name with the AP IP, so a phone that joins the network opens the wizard on its own. Hardware tests: [`docs/hardware/testing.md`](hardware/testing.md). How to wire this API into AI tools: [`integration.md`](integration.md).
 
@@ -16,7 +16,7 @@ Firmware answers mDNS A and AAAA (IPv6 link-local) so macOS does not wait 2–3s
 
 ### `GET /`
 
-HTML endpoint index. Lists all routes plus supported parameters for `/anim`, `/settings`, `/test/servo`, `/setup/servo`, `/setup/led`, `/setup/audio`, `/setup/oled`, and `/servos/park`. Safe, no hardware side effects. Always public (no Bearer required).
+HTML endpoint index. Lists all routes plus supported parameters for `/anim`, `/settings`, `/play`, `/mic`, `/pose`, `/ranges`, `/ranges/explore`, `/test/servo`, `/setup/servo`, `/setup/led`, `/setup/audio`, `/setup/oled`, and `/servos/park`. Safe, no hardware side effects. Always public (no Bearer required).
 
 Open in a browser:
 
@@ -74,7 +74,10 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://tiny-engineer.local/health
   "provisioning": false,
   "setup_ap_ssid": "",
   "setup_ap_ip": "",
-  "oled": true
+  "oled": true,
+  "mic": { "present": true, "muted": false, "streaming": true },
+  "current_ma": 182.4,
+  "bumps": 0
 }
 ```
 
@@ -95,6 +98,11 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://tiny-engineer.local/health
 | `setup_ap_ssid` | Setup AP SSID when `provisioning` is true, else `""` |
 | `setup_ap_ip` | Setup AP IP when `provisioning` is true (usually `192.168.4.1`), else `""` |
 | `oled` | SSD1306 probed and initialized |
+| `mic.present` | INMP441 data seen (non-constant samples) since boot; `false` without a mic |
+| `mic.muted` | Mic muted (button on GP7 or [`POST /mic`](#post-mic)); saved in NVS |
+| `mic.streaming` | UDP mic packets are reaching the network stack ([Mic stream](#mic-stream-udp)) |
+| `current_ma` | Servo-rail current from the optional INA219 (mA, one decimal), or `null` without the sensor |
+| `bumps` | Entries in the bump log ([`GET /ranges`](#get-ranges)) |
 
 ### `GET /settings`
 
@@ -122,6 +130,10 @@ curl http://tiny-engineer.local/settings
   "servo_maxs": [100, 100, 100, 100, 100],
   "rgb_order": "GRB",
   "oled_rotate_180": false,
+  "brain_host": "192.168.1.20",
+  "brain_port": 47100,
+  "bump_threshold_ma": 650,
+  "mic_shift": 14,
   "wifi_networks": ["MyNetwork", "Office"]
 }
 ```
@@ -144,11 +156,15 @@ curl http://tiny-engineer.local/settings
 | `servo_maxs` | Per-joint safe maximum degrees (stock defaults **100, 100, 100, 100, 100**). Each max must be greater than the matching min |
 | `rgb_order` | Onboard WS2812 wire-byte order (`RGB`, `RBG`, `GRB`, `GBR`, `BRG`, `BGR`). Default **`GRB`**. Survives factory reset |
 | `oled_rotate_180` | OLED 180° rotation (`true` → `setRotation(2)`). Default **`false`**. Setup AP only. Survives factory reset |
+| `brain_host` | Where the mic streams: IPv4 or hostname of the Chip brain. Default **`""`** (streaming off). See [Mic stream](#mic-stream-udp) |
+| `brain_port` | UDP port for the mic stream. Default **47100** |
+| `bump_threshold_ma` | Bump reflex: servo-rail current above the idle baseline that counts as a bump (after 60 ms while moving). Default **650**; `0` disables the reflex. Needs the INA219 ([Bump reflex](#bump-reflex)) |
+| `mic_shift` | Mic gain: 16-bit sample = saturate(32-bit I2S slot >> `mic_shift`). Lower = louder, 6 dB per step. Default **14** |
 | `reboot_required` | `true` once the saved `hostname`, `loading` or WiFi networks differ from what this boot started with; those apply only after a reboot |
 
 ### `POST /settings`
 
-Update one or more settings from a JSON object body. Values are written to NVS. `sleep_timeout`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `eyes_style`, and `access_token` apply immediately; a changed `hostname` or `loading` takes effect on the **next reboot**. WiFi networks are set with [`PUT /settings/wifi`](#put-settingswifi). Servo ranges (`servo_mins` + `servo_maxs`), RGB LED mapping (`rgb_order`) and OLED rotation (`oled_rotate_180`) are **setup AP only** and apply immediately. Requires Bearer when auth is enabled.
+Update one or more settings from a JSON object body. Values are written to NVS. `sleep_timeout`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `eyes_style`, `access_token`, `brain_host`, `brain_port`, `bump_threshold_ma`, and `mic_shift` apply immediately; a changed `hostname` or `loading` takes effect on the **next reboot**. WiFi networks are set with [`PUT /settings/wifi`](#put-settingswifi). Servo ranges (`servo_mins` + `servo_maxs`), RGB LED mapping (`rgb_order`) and OLED rotation (`oled_rotate_180`) are **setup AP only** and apply immediately. Requires Bearer when auth is enabled.
 
 ```bash
 curl -X POST "http://tiny-engineer.local/settings" \
@@ -160,6 +176,9 @@ curl -X POST "http://tiny-engineer.local/settings" \
 curl -X POST "http://192.168.4.1/settings" \
   -H "Content-Type: application/json" \
   -d '{"servo_mins":[80,80,80,80,80],"servo_maxs":[100,100,100,100,100],"rgb_order":"GRB","oled_rotate_180":true}'
+curl -X POST "http://tiny-engineer.local/settings" \
+  -H "Content-Type: application/json" \
+  -d '{"brain_host":"192.168.1.20","brain_port":47100,"bump_threshold_ma":650,"mic_shift":14}'
 ```
 
 ```json
@@ -180,6 +199,10 @@ curl -X POST "http://192.168.4.1/settings" \
   "servo_maxs": [100, 100, 100, 100, 100],
   "rgb_order": "GRB",
   "oled_rotate_180": false,
+  "brain_host": "",
+  "brain_port": 47100,
+  "bump_threshold_ma": 650,
+  "mic_shift": 14,
   "wifi_networks": ["MyNetwork"],
   "reboot_required": true
 }
@@ -201,6 +224,10 @@ curl -X POST "http://192.168.4.1/settings" \
 | `servo_maxs` | integer array | Five integers `0`–`180`; setup AP only; each value must be greater than the matching min |
 | `rgb_order` | string | `RGB`, `RBG`, `GRB`, `GBR`, `BRG`, or `BGR`; setup AP only; default `GRB` |
 | `oled_rotate_180` | boolean | Setup AP only; default `false` |
+| `brain_host` | string | 0–63 chars, `[A-Za-z0-9.-]` (hostname or IPv4), not starting with `-` or `.` nor ending with `-`; empty turns the mic stream off; default empty |
+| `brain_port` | integer | 1–65535; default `47100` |
+| `bump_threshold_ma` | integer | 0–3000 mA; `0` disables the bump reflex; default `650` |
+| `mic_shift` | integer | 8–20; default `14` |
 
 Leave out a field to keep its saved value. An empty object → **400** `send at least one setting`. A field this route does not know → **400** `unknown field <field>`. A field with the wrong type or out of range → **400** `invalid <field>` (servo ranges that overlap or exceed 180: `invalid servo_mins or servo_maxs`). Only one of `servo_mins` / `servo_maxs` → **400** `servo_mins and servo_maxs go together`. On any 400, nothing is saved. Outside setup AP mode, servo ranges → **400** `servo setup only in AP mode`, `rgb_order` → **400** `rgb setup only in AP mode`, `oled_rotate_180` → **400** `oled setup only in AP mode`. Replies carry `reboot_required` as in `GET /settings`.
 
@@ -225,7 +252,7 @@ The list must hold 1 to 5 networks, so the robot always has one to try; factory 
 
 ### `POST /settings/reset`
 
-Factory reset: clears the NVS `te` namespace and restores settings to compile-time defaults and clears every saved WiFi network. **Servo min/max, RGB LED mapping (`rgb_order`), and OLED rotation (`oled_rotate_180`) are kept.** Internal last-pose blob (`spose`) is cleared/reset with defaults. After reset, power-cycle (or press reset) so the device reopens setup AP mode and WiFi can be configured again; the servo, screen, and LED steps are pre-filled with the saved values and can be retuned. Until reboot, credentials are cleared in NVS but the radio may still be on the previous STA network. No body. Requires Bearer when auth is enabled. Same JSON shape as `GET /settings`.
+Factory reset: clears the NVS `te` namespace and restores settings to compile-time defaults and clears every saved WiFi network. **Servo min/max, RGB LED mapping (`rgb_order`), and OLED rotation (`oled_rotate_180`) are kept.** Internal last-pose blob (`spose`) is cleared/reset with defaults. The Chip settings (`brain_host`, `brain_port`, `bump_threshold_ma`, `mic_shift`) return to their defaults, and the saved mic mute (`mic_mute`) is cleared: the mic stays as it is until the next boot, then starts unmuted. After reset, power-cycle (or press reset) so the device reopens setup AP mode and WiFi can be configured again; the servo, screen, and LED steps are pre-filled with the saved values and can be retuned. Until reboot, credentials are cleared in NVS but the radio may still be on the previous STA network. No body. Requires Bearer when auth is enabled. Same JSON shape as `GET /settings`.
 
 The Config web UI clears the browser-stored Bearer token and shows a one-shot gate: power-cycle the device, then join the robot WiFi shown on the OLED and open the setup wizard. It does not poll for reconnect.
 
@@ -250,6 +277,10 @@ curl -X POST "http://tiny-engineer.local/settings/reset"
   "servo_maxs": [100, 100, 100, 100, 100],
   "rgb_order": "GRB",
   "oled_rotate_180": false,
+  "brain_host": "",
+  "brain_port": 47100,
+  "bump_threshold_ma": 650,
+  "mic_shift": 14,
   "wifi_networks": [],
   "reboot_required": true
 }
@@ -466,7 +497,7 @@ Wrong fields return **400** and do not move any servo:
 | `invalid index` | `index` missing, not an integer, or outside `0`–`4` |
 | `invalid angle` | `angle` missing, not a number, or outside `0`–`180` |
 
-Assembled robot: firmware clamps to the NVS min/max from setup (stock defaults in [robot-movement.md](robot-movement.md)); this route still accepts 0–180 and clamps. For unclamped assembly moves, use setup AP `POST /setup/servo`.
+Assembled robot: firmware clamps to the soft limits — the NVS min/max from setup, kept inside the hard caps and narrowed by bumps (see [`GET /ranges`](#get-ranges); stock defaults in [robot-movement.md](robot-movement.md)); this route still accepts 0–180 and clamps. For unclamped assembly moves, use setup AP `POST /setup/servo`.
 
 ### `GET /anim`
 
@@ -482,7 +513,7 @@ curl http://tiny-engineer.local/anim
 
 | Field | Meaning |
 | --- | --- |
-| `animation` | `none`, `typing`, `reading`, `thinking`, `talking`, `ring`, `welcome`, `attention`, `error`, `abort`, `dead`, `wakeup`, or `sleep` |
+| `animation` | `none`, `typing`, `reading`, `thinking`, `talking`, `listening`, `ring`, `welcome`, `attention`, `error`, `abort`, `dead`, `wakeup`, or `sleep` |
 
 ### `POST /anim`
 
@@ -490,13 +521,14 @@ Request an animation switch. Each animation runs at least **1s**; if the current
 
 | Param | Type | Values |
 | --- | --- | --- |
-| `name` | string | `none`, `typing`, `reading`, `thinking`, `talking`, `ring`, `welcome`, `attention`, `error`, `abort`, `dead`, `wakeup`, `sleep` |
+| `name` | string | `none`, `typing`, `reading`, `thinking`, `talking`, `listening`, `ring`, `welcome`, `attention`, `error`, `abort`, `dead`, `wakeup`, `sleep` |
 
 ```bash
 curl -X POST "http://tiny-engineer.local/anim?name=typing"
 curl -X POST "http://tiny-engineer.local/anim?name=reading"
 curl -X POST "http://tiny-engineer.local/anim?name=thinking"
 curl -X POST "http://tiny-engineer.local/anim?name=talking"
+curl -X POST "http://tiny-engineer.local/anim?name=listening"
 curl -X POST "http://tiny-engineer.local/anim?name=ring"
 curl -X POST "http://tiny-engineer.local/anim?name=welcome"
 curl -X POST "http://tiny-engineer.local/anim?name=wakeup"
@@ -523,6 +555,7 @@ Durations and quoted lines below are the stock clips in [`assets/`](../assets/).
 | `reading` | **Continuous.** Hands/body park as in `none`. Head nods on same lowest 10° band as typing, but slower. Neck sweeps ±10° around mid; right (angle down) slower than left (angle up). Occasional right-hand down-arrow bursts (1–3 presses, same 15° band as typing). Runs until replaced, or until `continuous_timeout` triggers `attention`. Same-name re-`POST` refreshes that timeout without restarting motion. |
 | `thinking` | **Continuous.** Hands/body park as in `none`. Head (pitch) and neck (yaw) ease from the current pose into thinking poses (up + slight left/right). Move → pause → optional micro-adjust (sometimes chained) → pause; nearby pose drift with occasional larger shifts after ~2.2 s, more often over time. Axes stagger start/duration; no periodic sway. Runs until replaced, or until `continuous_timeout` triggers `attention`. Same-name re-`POST` refreshes that timeout without restarting motion. |
 | `talking` | **Continuous.** Speaking fidget with no sound of its own. Also the default pose for [`POST /play`](#post-play). Via `/anim`, the head faces the user just above mid with soft random nods, slow neck drift, occasional small torso shifts, and occasional right-hand lifts. During `/play` with pose `talking`, motion follows speech energy from the PCM stream (no extra metadata): emphasis triggers nods, silence settles the pose, phrase starts may raise the hand or shift the torso (not both). **Classic eyes:** a little taller than idle; glances away when ambient or quiet, gaze locked on the listener while speech energy is high. Runs until replaced, or until `continuous_timeout` triggers `attention`. Same-name re-`POST` refreshes that timeout without restarting motion. |
+| `listening` | **Continuous.** Head up toward the user (`+2/7` of the head range, like `welcome`), neck and body centred, hands at rest (right `min`, left `max`), then **holds completely still**: no fidget, and PWM goes full-off after all joints are still for 2 s (same as `none`) so servo noise stays off the mic. **Classic eyes:** taller than idle and lifted a pixel, gaze held on the user with a rare one-pixel drift. LED off. Allowed as a [`/play/{name}`](#post-play) pose. Runs until replaced, or until `continuous_timeout` triggers `attention`. Same-name re-`POST` refreshes that timeout without restarting motion. |
 | `ring` | **One-shot** service-bell gesture; does not loop. Wind-up (body `min`, neck mid, head mid+10°, both hands `max`) → fast right-hand strike to `min+5°` with head to `min` → plays `bell.wav` once on strike (LittleFS; same `uploadfs` requirement as `/test/audio/bell`) → slower bounce to `min+20°` → return to `none` pose and stop. After completion, `GET /anim` reports `none`. |
 | `welcome` | **One-shot** hello gesture synced to `welcome.wav` (~2.7 s). Right hand raises during "Hello, human.", holds through the pause, wiggles during "What are we building today?", then lowers. Head nods to mid+10° and returns. Plays automatically after successful Wi-Fi connect at boot; also via API. Requires `welcome.wav` on LittleFS (same `uploadfs` flow as `bell.wav`). After completion, `GET /anim` reports `none`. |
 | `attention` | Friendly input-request gesture synced to `attention.wav` (~3.0 s, "pst... human.... you might want to take a look"). Moves into a calm prompt pose first (centered body/neck, head slightly up, right hand raised partway), waits until all servos stop, then plays audio with light neck/head/hand motion during playback (whisper hold → lean toward user → glance/point on "take a look"). **Classic eyes:** phased blink/look cues during audio. After audio ends (or if audio fails to start), holds a gentle waiting loop for **1 minute** (soft head/neck drifts plus occasional slight right-hand waves), then returns to `none`. Requires `attention.wav` on LittleFS (same `uploadfs` flow as `bell.wav`). |
@@ -540,7 +573,7 @@ When `eyes_style=kaomoji`, the OLED shows looping faces from the expression libr
 | --- | --- |
 | `none` (idle) | Idle |
 | `typing`, `thinking` | Thinking |
-| `reading`, `attention` | Curious |
+| `reading`, `attention`, `listening` | Curious |
 | `ring` | Surprise |
 | `welcome`, `talking` | Happy |
 | `error` | Angry |
@@ -563,15 +596,15 @@ Wrong params return **400**:
 | `error` | When |
 | --- | --- |
 | `missing name` | Query param `name` absent |
-| `unknown animation` | `name` not `none`, `typing`, `reading`, `thinking`, `talking`, `ring`, `welcome`, `attention`, `error`, `abort`, `dead`, `wakeup`, or `sleep` |
+| `unknown animation` | `name` not `none`, `typing`, `reading`, `thinking`, `talking`, `listening`, `ring`, `welcome`, `attention`, `error`, `abort`, `dead`, `wakeup`, or `sleep` |
 
 ### `POST /play`
 
-Streams a WAV to the speaker while one animation runs, then returns to the continuous animation (`typing`, `reading`, `thinking`, `talking`) that was running before the request, otherwise to `none`. The body is played as it arrives, so clips of any length need no storage on the robot. The response comes when the clip ends.
+Streams a WAV to the speaker while one animation runs, then returns to the continuous animation (`typing`, `reading`, `thinking`, `talking`, `listening`) that was running before the request, otherwise to `none`. The body is played as it arrives, so clips of any length need no storage on the robot. The response comes when the clip ends.
 
 | Part | Value |
 | --- | --- |
-| Path | `/play` runs `talking`; `/play/{name}` runs `talking`, `typing`, `reading`, `thinking`, or `none`. Animations with their own sound are rejected so two clips never overlap |
+| Path | `/play` runs `talking`; `/play/{name}` runs `talking`, `typing`, `reading`, `thinking`, `listening`, or `none`. Animations with their own sound are rejected so two clips never overlap |
 | Body | WAV, 16-bit mono PCM at 22050 Hz (the firmware `SAMPLE_RATE`). `Content-Length` is required. Chunks other than `fmt ` and `data` are skipped |
 | `Authorization` | `Bearer <token>` when `access_token` is set |
 
@@ -592,18 +625,211 @@ Errors arrive before any audio plays:
 
 | Status | `error` | When |
 | --- | --- | --- |
-| `400` | `name must be talking, typing, reading, thinking or none` | `{name}` is unknown or has its own sound |
+| `400` | `name must be talking, typing, reading, thinking, listening or none` | `{name}` is unknown or has its own sound |
 | `415` | `expected 16-bit mono PCM at 22050 Hz` | WAV format or sample rate differs |
 | `415` | `not a WAV file`, `no audio data` | Body is not a RIFF/WAVE file, or has no `data` chunk |
+
+### `GET /mic`
+
+Mic state. Safe, no hardware side effects. Optional hardware: INMP441 I2S mic on GP6 and a mute button on GP7 ([pinout](hardware/pinout.md)). Without them the routes still answer (`present` stays `false`).
+
+```bash
+curl http://tiny-engineer.local/mic
+```
+
+```json
+{ "ok": true, "muted": false, "streaming": true, "present": true, "level": 0.042 }
+```
+
+| Field | Meaning |
+| --- | --- |
+| `muted` | Mic muted. Saved in NVS (`mic_mute`), so it survives a reboot |
+| `streaming` | Audio packets are going out ([Mic stream](#mic-stream-udp)): not muted, Wi-Fi up, `brain_host` set and resolved, last send accepted |
+| `present` | Mic data seen (non-constant samples) since boot |
+| `level` | Recent RMS of the mic signal after `mic_shift`, `0`–`1` (three decimals); `0` while muted |
+
+### `POST /mic`
+
+Mute or unmute. The momentary button on GP7 toggles the same state. JSON body.
+
+| Field | Type | Range |
+| --- | --- | --- |
+| `muted` | boolean | Required; saved to NVS |
+
+```bash
+curl -X POST "http://tiny-engineer.local/mic" -H "Content-Type: application/json" -d '{"muted":true}'
+```
+
+Reply: same JSON as `GET /mic`. Missing or non-boolean `muted` → **400** `invalid muted`.
+
+While muted the robot shows a mark: a crossed-out microphone in the top-right corner of the OLED eyes (every eye style), and the RGB LED glows **dim amber** wherever the animation would leave it off (`none`, `sleep`, `listening`; also visible while the OLED sleeps).
+
+### `POST /pose`
+
+Smooth free-form move for idle personality and "look at you". Stops the current animation (it becomes `none`, without the `none` park), counts as activity (wakes the eyes and OLED from sleep and restarts the idle clock), and returns once the move has **started**. JSON body.
+
+| Field | Type | Range |
+| --- | --- | --- |
+| `pose` | array | 5 entries `[head, neck, left, right, body]`, each `-1`–`1` in the saved range (same pose space as animations), or `null` to leave that joint where it is |
+| `ms` | integer | `100`–`5000`, time to arrive (eased, cubic in/out); default `600` |
+
+```bash
+curl -X POST "http://tiny-engineer.local/pose" -H "Content-Type: application/json" \
+  -d '{"pose":[0.3, null, null, null, -0.2], "ms": 600}'
+```
+
+```json
+{ "ok": true }
+```
+
+Targets are clamped to the soft limits ([`GET /ranges`](#get-ranges)). The move still respects `SERVO_MAX_SPEED_DEG_S` (140°/s): when `ms` is too short for the distance, the move stretches until the eased peak speed fits. A later `/anim`, `/pose`, or a bump cancels it. After the joints are still for 2 s, PWM goes full-off as in `none`.
+
+| Status | `error` | When |
+| --- | --- | --- |
+| `400` | `invalid pose` | `pose` missing, not an array of 5, or an entry that is neither `null` nor a number in `-1`–`1` |
+| `400` | `invalid ms` | `ms` not an integer in `100`–`5000` |
+| `503` | `busy` | A serial `/play` stream holds the robot |
+
+### `GET /ranges`
+
+Servo limits, servo-rail current and the bump log. Safe, no hardware side effects.
+
+```bash
+curl http://tiny-engineer.local/ranges
+```
+
+```json
+{
+  "ok": true,
+  "saved_mins": [40, 50, 60, 70, 80],
+  "saved_maxs": [140, 130, 120, 110, 100],
+  "soft_mins": [40, 50, 60, 70, 80],
+  "soft_maxs": [128, 130, 120, 110, 100],
+  "hard_mins": [10, 10, 10, 10, 10],
+  "hard_maxs": [170, 170, 170, 170, 170],
+  "current_ma": 123.4,
+  "sensor": true,
+  "bump_threshold_ma": 650,
+  "bumps": [
+    { "t_ms": 812345, "joint": 0, "angle": 130.2, "dir": "max", "current_ma": 980.1, "anim": "typing" }
+  ]
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `saved_mins` / `saved_maxs` | NVS calibration `[head, neck, left, right, body]` in degrees; animations and `/pose` map `-1`–`1` onto it |
+| `soft_mins` / `soft_maxs` | Runtime limits (RAM only): saved clamped into the hard caps, narrowed by bumps. Animations, `/pose` and `/test/servo` are clamped to them. Reset to saved at boot, on `POST /ranges`, on `POST /bumps/clear`, and whenever the saved calibration changes |
+| `hard_mins` / `hard_maxs` | Compile-time caps (`SERVO_HARD_MIN_DEG` / `SERVO_HARD_MAX_DEG` in [`include/servos.h`](../include/servos.h)), 10°–170° on every joint. Nothing at runtime goes past them |
+| `current_ma` | Latest servo-rail current (mA), or `null` without an INA219 |
+| `sensor` | INA219 found at `0x41` at boot |
+| `bump_threshold_ma` | Same as the setting |
+| `bumps` | Newest first, at most 32 (RAM only): bump time (`millis()`), joint, angle where it happened (degrees), travel direction, peak current of the bump window (mA), and the animation that was running |
+
+### `POST /ranges`
+
+Save a new servo calibration **outside setup mode** (the brain's range coaching). JSON body; both fields required. Values are degrees; numbers are rounded to whole degrees (NVS stores integers).
+
+| Field | Type | Range |
+| --- | --- | --- |
+| `servo_mins` | number array | 5 values; each `hard_min` ≤ min < max |
+| `servo_maxs` | number array | 5 values; each max ≤ `hard_max`, and max − min ≥ 6° |
+
+```bash
+curl -X POST "http://tiny-engineer.local/ranges" -H "Content-Type: application/json" \
+  -d '{"servo_mins":[40,50,60,70,80],"servo_maxs":[140,130,120,110,100]}'
+```
+
+Reply: same JSON as `GET /ranges`. Soft limits reset to the new saved values; the bump log is kept. The setup wizard's own path (`POST /settings` with `servo_mins` / `servo_maxs` in setup AP) is unchanged.
+
+| Status | `error` | When |
+| --- | --- | --- |
+| `400` | `servo_mins and servo_maxs go together` | One of them missing |
+| `400` | `invalid servo_mins` / `invalid servo_maxs` | Not an array of 5 numbers in `0`–`180` |
+| `400` | e.g. `left min 9 below hard min 10`, `body max 171 above hard max 170`, `head min must be below max`, `neck span below 6 deg` | Validation failed (first joint that fails, in `head, neck, left, right, body` order) |
+| `400` | `save failed` | NVS write failed |
+
+### `POST /ranges/explore`
+
+Probe how far one joint can really go. **Blocking** (like `/test/*`): stops the animation and any `/pose` move, holds the other joints where they are (PWM on), moves the joint at 40°/s to its saved limit in that direction, then moves it slowly toward the hard cap until a bump or the cap. It then backs off 4° toward mid and returns the joint inside its soft limits. **Saves nothing**; the brain decides what to keep with `POST /ranges`. Needs the INA219. JSON body.
+
+| Field | Type | Range |
+| --- | --- | --- |
+| `joint` | integer | `0`–`4` (`head, neck, left, right, body`) |
+| `dir` | string | `min` or `max` |
+| `speed` | number | `5`–`30` °/s; default `10` |
+
+```bash
+curl -X POST "http://tiny-engineer.local/ranges/explore" -H "Content-Type: application/json" \
+  -d '{"joint":0,"dir":"max","speed":10}'
+```
+
+```json
+{ "ok": true, "joint": 0, "dir": "max", "stopped_at": 151.3, "reason": "bump", "safe": 147.3, "peak_ma": 1042.5 }
+```
+
+| Field | Meaning |
+| --- | --- |
+| `stopped_at` | Angle (degrees) where the joint stopped |
+| `reason` | `bump` (current over the baseline + threshold for 60 ms) or `hard_limit` (reached the hard cap) |
+| `safe` | `stopped_at` backed off 4° toward the saved mid (degrees, inside the hard caps) |
+| `peak_ma` | Highest servo-rail current while moving (mA) |
+
+The bump test uses `bump_threshold_ma`, or the default 650 mA when the setting is `0`. Explore bumps do not enter the bump log or change the soft limits.
+
+| Status | `error` | When |
+| --- | --- | --- |
+| `400` | `invalid joint` / `invalid dir` / `invalid speed` | Field missing (except `speed`) or out of range |
+| `409` | `no current sensor` | No INA219 at `0x41` |
+| `503` | `busy` | A serial `/play` stream holds the robot |
+
+### `POST /bumps/clear`
+
+Empty the bump log and reset the soft limits to the saved calibration. No body.
+
+```bash
+curl -X POST "http://tiny-engineer.local/bumps/clear"
+```
+
+```json
+{ "ok": true }
+```
+
+### Bump reflex
+
+With an INA219 at `0x41` (servo rail current, [interfaces](hardware/interfaces.md#i2c)), the firmware reads the current every loop tick (at most every 5 ms; ticks run every 10–20 ms while the OLED redraws) and keeps an idle baseline (exponential average while no servo moves). A **bump** is current above `baseline + bump_threshold_ma` for **≥ 60 ms** while at least one servo is moving. On a bump the firmware:
+
+1. Switches the animation to `none` (without the `none` park) and stops every joint where it is.
+2. Moves each joint that was moving 4° back against its travel direction at 25°/s (on an outward move it stops at the saved mid when closer than that).
+3. Sets that joint's soft limit on the side it was travelling to `angle − 2°` (`angle + 2°` for `min`), never past the saved mid and never wider than before.
+4. Logs one bump entry per moving joint ([`GET /ranges`](#get-ranges)).
+
+Further bumps are ignored for 500 ms. The reflex never widens anything; only `POST /ranges` (validated) can. It is off in setup AP mode, with `bump_threshold_ma` = `0`, or without the sensor.
+
+### Mic stream (UDP)
+
+With an INMP441 fitted and `brain_host` set, the robot streams the mic to `brain_host:brain_port` over UDP, only while Wi-Fi is connected and the mic is not muted. Wire format (contract: [`chip/PROTOCOL.md`](../chip/PROTOCOL.md) §3): a 16-byte header, then 16-bit signed little-endian **mono** PCM at **22050 Hz**, 256 samples per packet (~86 packets/s).
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| 0 | 4 | magic `CHP1` |
+| 4 | 4 | `seq` uint32 LE, +1 per packet (heartbeats included), wraps |
+| 8 | 4 | `t_ms` uint32 LE, robot `millis()` of the first sample |
+| 12 | 2 | `flags` uint16 LE: bit0 `muted`, bit1 `speaker` (any speaker audio playing, or ended < 300 ms ago), bit2 `moving` (any servo moving), bit3 `asleep` |
+| 14 | 2 | `n` uint16 LE, sample count (256; `0` for a heartbeat) |
+
+While muted: no audio, one heartbeat (`n = 0`, `muted` set) per second. The brain must discard audio with `speaker` set. A hostname in `brain_host` is resolved (DNS / mDNS) on the robot and re-resolved every 60 s; an IPv4 literal skips DNS. Samples are `saturate(slot >> mic_shift)` from the left 32-bit I2S slot (the INMP441 sends 24-bit data, MSB aligned).
 
 ## Errors
 
 | Status | Body | When |
 | --- | --- | --- |
-| `400` | `{"ok":false,"error":"..."}` | Bad body or fields on `/settings`, `/settings/wifi`, `/test/servo` or `/setup/*`, or bad `/anim` or `/play` params (see tables above) |
+| `400` | `{"ok":false,"error":"..."}` | Bad body or fields on `/settings`, `/settings/wifi`, `/test/servo`, `/setup/*`, `/mic`, `/pose`, `/ranges` or `/ranges/explore`, or bad `/anim` or `/play` params (see tables above) |
 | `401` | `{"ok":false,"error":"unauthorized"}` | Access token configured and `Authorization: Bearer` missing or wrong |
 | `404` | `{"ok":false,"error":"not found"}` | Unknown path |
+| `409` | `{"ok":false,"error":"no current sensor"}` | `POST /ranges/explore` without an INA219 |
 | `415` | `{"ok":false,"error":"..."}` | `/play` body is not a supported WAV |
+| `503` | `{"ok":false,"error":"busy"}` | `POST /pose` or `POST /ranges/explore` while a serial `/play` stream holds the robot |
 | `405` | `{"ok":false,"error":"method not allowed"}` | Wrong method on any known path, web panel pages included |
 
 Test routes are **POST**. GET/prefetch would move hardware. `/anim` allows **GET** (read) and **POST** (set). `/auth` is **GET** only and always public.
@@ -612,11 +838,11 @@ Test routes are **POST**. GET/prefetch would move hardware. `/anim` allows **GET
 
 Test handlers **block** until the test finishes. The client waits. After each test, OLED returns to `ROBOT READY` plus IP (or `WIFI FAIL`).
 
-`/anim` responses return immediately; typing motion runs in the main loop via non-blocking servo updates. Animation switches may defer up to 1s so the active animation holds its minimum duration; only the latest pending request is applied. Continuous animations (`typing`, `reading`, `thinking`, `talking`) that stay active longer than `continuous_timeout` minutes switch to `attention`, which holds ~1 minute then finishes to `none`. Re-`POST`ing the same continuous animation (e.g. `typing` while already `typing`) does not restart motion, but resets the continuous-timeout clock.
+`/anim` responses return immediately; typing motion runs in the main loop via non-blocking servo updates. Animation switches may defer up to 1s so the active animation holds its minimum duration; only the latest pending request is applied. Continuous animations (`typing`, `reading`, `thinking`, `talking`, `listening`) that stay active longer than `continuous_timeout` minutes switch to `attention`, which holds ~1 minute then finishes to `none`. Re-`POST`ing the same continuous animation (e.g. `typing` while already `typing`) does not restart motion, but resets the continuous-timeout clock.
 
 The onboard RGB LED follows the active animation (see [RGB LED](#rgb-led)).
 
-`/play` holds the connection until the clip ends.
+`/play` holds the connection until the clip ends. `POST /ranges/explore` blocks like the test routes (seconds, up to ~35 s at 5°/s).
 
 One request at a time — the Arduino `WebServer` is single-threaded. While `/play` streams, other requests wait.
 
@@ -629,7 +855,7 @@ Onboard WS2812 on **GPIO10** (`RGB_LED_PIN`). Byte order is the saved `rgb_order
 | `typing`, `reading`, `thinking`, `talking`, `welcome`, `ring`, `wakeup` | White (full intensity) |
 | `attention`, `error`, `dead` | Red pulse: 500 ms 10%→100%, 500 ms hold 100%, 500 ms 100%→10%, repeat |
 | `abort` | Red (full intensity, solid) |
-| `none`, `sleep` | Off |
+| `none`, `sleep`, `listening` | Off — **dim amber** instead while the mic is muted |
 
 Transitions take **1 s** with smooth fade in/out (pulse modes start immediately, no enter fade):
 

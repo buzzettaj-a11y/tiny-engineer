@@ -38,6 +38,9 @@ constexpr float TALKING_HAND_LIFT_AMBIENT = TYPING_HAND_BAND * 1.4f;
 constexpr float TALKING_EMPHASIS_NOD = 0.18f;
 constexpr uint32_t TALKING_NOD_COOLDOWN_MS = 160;
 
+// Listening faces the user (head up like welcome), torso centred, hands at rest.
+constexpr float LISTENING_HEAD_UP = 2.0f / 7.0f;
+
 constexpr float READING_HEAD_LOW = -1.0f;
 constexpr float READING_HEAD_HIGH = READING_HEAD_LOW + READING_HEAD_BAND;
 constexpr float READING_NECK_MID = 0.0f;

@@ -2,9 +2,9 @@
 
 Persistent settings live in NVS (namespace `te`) under [`src/settings/`](../src/settings/). They are exposed on `GET`/`POST /settings`, the Config web UI, and must stay in sync with API docs.
 
-**HTTP / JSON** (`POST /settings` body and `GET /settings` fields — see [api.md](api.md)): `sleep_timeout`, `hostname`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `loading`, `eyes_style`, `access_token`, `servo_mins` / `servo_maxs`, `rgb_order`, `oled_rotate_180`. WiFi networks have their own endpoint, `PUT /settings/wifi`, and show as `wifi_networks`.
+**HTTP / JSON** (`POST /settings` body and `GET /settings` fields — see [api.md](api.md)): `sleep_timeout`, `hostname`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `loading`, `eyes_style`, `access_token`, `servo_mins` / `servo_maxs`, `rgb_order`, `oled_rotate_180`, `brain_host`, `brain_port`, `bump_threshold_ma`, `mic_shift`. WiFi networks have their own endpoint, `PUT /settings/wifi`, and show as `wifi_networks`.
 
-**NVS keys** (≤15 chars; defined in [`nvs.h`](../src/settings/nvs.h)): `sleep_m`, `host`, `vol`, `welcome`, `serial_log`, `cont_to`, `loading`, `eyes_sty`, `access_tok`, `wifi_nets` (blob of up to 5 networks; replaces the older single-network `wifi_ssid` / `wifi_pass`, which are migrated on load), `sranges`, `rgb_ord`, `oled_rot`. Last commanded servo angles live in the same namespace as key `spose` (internal; not a settings API field). Boot removes a leftover `srv_hold` key from older firmware. Add new short keys there — do not reuse HTTP names as NVS keys unless they already fit the length limit.
+**NVS keys** (≤15 chars; defined in [`nvs.h`](../src/settings/nvs.h)): `sleep_m`, `host`, `vol`, `welcome`, `serial_log`, `cont_to`, `loading`, `eyes_sty`, `access_tok`, `wifi_nets` (blob of up to 5 networks; replaces the older single-network `wifi_ssid` / `wifi_pass`, which are migrated on load), `sranges`, `rgb_ord`, `oled_rot`, `brain_host`, `brain_port`, `bump_ma`, `mic_shift`. Last commanded servo angles live in the same namespace as key `spose` (internal; not a settings API field). The mic mute state is key `mic_mute` (bool, written by [`src/mic/mic.cpp`](../src/mic/mic.cpp) for `POST /mic` and the GP7 button; not a settings API field). Boot removes a leftover `srv_hold` key from older firmware. Add new short keys there — do not reuse HTTP names as NVS keys unless they already fit the length limit.
 
 Follow the same pattern for a new setting.
 
@@ -16,7 +16,7 @@ Follow the same pattern for a new setting.
 | RAM | One `SettingsValues` struct (`g_settings`) filled by `initSettings()`; callers use getters |
 | Update API | `saveSettings(const SettingsPatch&)`: only the fields the patch sets change, and only changed keys are written to NVS |
 | HTTP | JSON object body on `POST /settings`; at least one field required |
-| Apply timing | Prefer immediate apply. If boot-only (like hostname), add it to `settingsRebootRequired()` so replies report `reboot_required`, and document it. WiFi networks live in a `WifiNetworkList` saved with `saveWifiNetworks()`, outside `saveSettings(...)`; they are tested before save only in setup AP mode. Servo min/max (`servo_mins` / `servo_maxs`), RGB LED mapping (`rgb_order`), and OLED rotation (`oled_rotate_180`) are setup-AP-only and apply immediately |
+| Apply timing | Prefer immediate apply (the Chip fields `brain_host`, `brain_port`, `bump_threshold_ma`, `mic_shift` do: the mic task picks them up on the next tick). `POST /ranges` saves `sranges` outside setup mode through `saveSettings()` after its own hard-cap validation. If boot-only (like hostname), add it to `settingsRebootRequired()` so replies report `reboot_required`, and document it. WiFi networks live in a `WifiNetworkList` saved with `saveWifiNetworks()`, outside `saveSettings(...)`; they are tested before save only in setup AP mode. Servo min/max (`servo_mins` / `servo_maxs`), RGB LED mapping (`rgb_order`), and OLED rotation (`oled_rotate_180`) are setup-AP-only and apply immediately |
 | Types | Prefer small integers / short strings; validate before any NVS write |
 
 ## Checklist
@@ -78,7 +78,7 @@ Flash only when you want to try it on hardware (`pio run -t upload`).
 ## Pitfalls
 
 - **Partial writes:** validate first; never write NVS then fail validation mid-way.
-- **Factory reset:** `factoryResetSettings()` in [`nvs.cpp`](../src/settings/nvs.cpp) clears NVS namespace `te` and writes defaults, which clears every saved WiFi network. Servo min/max (`sranges`), RGB LED mapping (`rgb_ord`), and OLED rotation (`oled_rot`) are written back unchanged. Internal pose blob (`spose`) is not rewritten (next boot uses mid). Exposed as `POST /settings/reset`. After reset, power-cycle into setup AP mode to configure WiFi again. Servo ranges, LED mapping, and screen rotation can be retuned in that wizard.
+- **Factory reset:** `factoryResetSettings()` in [`nvs.cpp`](../src/settings/nvs.cpp) clears NVS namespace `te` and writes defaults, which clears every saved WiFi network and the `mic_mute` key (the mic starts unmuted at the next boot). Servo min/max (`sranges`), RGB LED mapping (`rgb_ord`), and OLED rotation (`oled_rot`) are written back unchanged. Internal pose blob (`spose`) is not rewritten (next boot uses mid). Exposed as `POST /settings/reset`. After reset, power-cycle into setup AP mode to configure WiFi again. Servo ranges, LED mapping, and screen rotation can be retuned in that wizard.
 - **Hostname-style settings:** freeze the boot value separately if live change cannot apply (see `g_bootSettings` and `settingsRebootRequired()`).
 - **UI size:** the panel is embedded gzipped in the firmware; keep controls compact.
 - **Doc drift:** HTML param tables must match `api.md` exactly.

@@ -24,6 +24,19 @@ void loadText(char (&dest)[N], const char* key, bool (*valid)(const char*)) {
   }
 }
 
+template <typename T>
+void loadUInt(T& dest, const char* key, bool (*valid)(uint32_t)) {
+  if (!g_settingsPrefs.isKey(key)) {
+    return;
+  }
+
+  const uint32_t value = g_settingsPrefs.getUInt(key, dest);
+
+  if (valid(value)) {
+    dest = static_cast<T>(value);
+  }
+}
+
 void loadMinutes(uint32_t& dest, const char* key, bool (*valid)(uint32_t)) {
   if (!g_settingsPrefs.isKey(key)) {
     return;
@@ -87,6 +100,11 @@ void SettingsValues::load() {
   if (g_settingsPrefs.isKey(kKeyOledRot)) {
     oledRotate180 = g_settingsPrefs.getBool(kKeyOledRot, oledRotate180);
   }
+
+  loadText(brainHost, kKeyBrainHost, settingsValidateBrainHost);
+  loadUInt(brainPort, kKeyBrainPort, settingsValidateBrainPort);
+  loadUInt(bumpThresholdMa, kKeyBumpMa, settingsValidateBumpThreshold);
+  loadUInt(micShift, kKeyMicShift, settingsValidateMicShift);
 }
 
 namespace {
@@ -133,6 +151,10 @@ bool writeValues(const SettingsValues& values, const SettingsValues& before, boo
   putText(kKeyLinkMode, values.linkMode, before.linkMode);
   putText(kKeyRgbOrder, values.rgbOrder, before.rgbOrder);
   putBool(kKeyOledRot, values.oledRotate180, before.oledRotate180);
+  putText(kKeyBrainHost, values.brainHost, before.brainHost);
+  putUInt(kKeyBrainPort, values.brainPort, before.brainPort);
+  putUInt(kKeyBumpMa, values.bumpThresholdMa, before.bumpThresholdMa);
+  putUInt(kKeyMicShift, values.micShift, before.micShift);
 
   if (all || memcmp(&values.servoRanges, &before.servoRanges, sizeof(ServoRanges)) != 0) {
     uint8_t blob[kServoRangesLen];

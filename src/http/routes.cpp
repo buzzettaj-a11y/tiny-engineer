@@ -43,6 +43,13 @@ constexpr Route kRoutes[] = {
   {"/setup/audio", HTTP_POST, handleSetupAudio, Access::Setup},
   {"/setup/oled", HTTP_POST, handleSetupOled, Access::Setup},
   {"/servos/park", HTTP_POST, handleServosPark, Access::Token},
+  {"/mic", HTTP_GET, handleMicGet, Access::Configured},
+  {"/mic", HTTP_POST, handleMicPost, Access::Configured},
+  {"/pose", HTTP_POST, handlePosePost, Access::Configured},
+  {"/ranges", HTTP_GET, handleRangesGet, Access::Configured},
+  {"/ranges", HTTP_POST, handleRangesPost, Access::Configured},
+  {"/ranges/explore", HTTP_POST, handleRangesExplore, Access::Configured},
+  {"/bumps/clear", HTTP_POST, handleBumpsClear, Access::Configured},
 };
 
 bool isKnownPath(const String& uri) {

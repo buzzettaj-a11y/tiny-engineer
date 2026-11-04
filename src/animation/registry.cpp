@@ -8,6 +8,7 @@
 #include "animation/attention.h"
 #include "animation/dead.h"
 #include "animation/error.h"
+#include "animation/listening.h"
 #include "animation/reading.h"
 #include "animation/ring.h"
 #include "animation/sleep_anim.h"
@@ -22,6 +23,7 @@
 #include "display/eyes/modes/dead.h"
 #include "display/eyes/modes/error.h"
 #include "display/eyes/modes/idle.h"
+#include "display/eyes/modes/listening.h"
 #include "display/eyes/modes/reading.h"
 #include "display/eyes/modes/ring.h"
 #include "display/eyes/modes/talking.h"
@@ -129,6 +131,10 @@ void startSleepAt(uint32_t nowMs) {
 
 void startDeadAt(uint32_t /*nowMs*/) {
   startDead();
+}
+
+void startListeningAt(uint32_t /*nowMs*/) {
+  startListening();
 }
 
 constexpr ModeEntry kModes[] = {
@@ -274,6 +280,17 @@ constexpr ModeEntry kModes[] = {
     updateTalking,
     startTalkingEyes,
     updateTalkingEyes,
+  },
+  {
+    AnimationId::Listening,
+    EyeMode::Listening,
+    "listening",
+    true,
+    -1,
+    startListeningAt,
+    updateListening,
+    startListeningEyes,
+    updateListeningEyes,
   },
 };
 

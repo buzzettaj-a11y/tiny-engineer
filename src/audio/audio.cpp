@@ -4,8 +4,14 @@
 #include <LittleFS.h>
 #include <math.h>
 
+#include <cstring>
+
+#include "driver/gpio.h"
+
 #include "audio/audio_cues.h"
+#include "audio/i2s_frame.h"
 #include "audio/wav_stream.h"
+#include "hardware/activity.h"
 #include "pins.h"
 #include "display/oled.h"
 #include "settings/settings.h"
@@ -17,6 +23,20 @@ I2SClass I2S;
 namespace {
 
 bool audioStorageReady = false;
+
+// One stereo 32-bit frame buffer shared by every speaker writer. They all run on
+// the loop task and never nest, and keeping it off the stack matters inside the
+// deep /play call chain (2 KB).
+constexpr size_t kSpeakerFrames = 256;
+int32_t g_speakerFrames[kSpeakerFrames * 2];
+
+void writeSpeakerFrames(size_t frames) {
+  I2S.write(
+    reinterpret_cast<const uint8_t*>(g_speakerFrames),
+    frames * 2 * sizeof(int32_t)
+  );
+  activityNoteSpeakerWrite(millis());
+}
 
 constexpr const char* kAudioPartition = "spiffs";
 
@@ -96,33 +116,50 @@ bool initAudioStorage() {
   return true;
 }
 
+bool initI2sBus() {
+  // Full duplex: speaker data out on I2S_DIN, mic data in on I2S_MIC_SD, one
+  // BCLK/WS pair. 32-bit slots give the INMP441 its 64 BCLK per frame.
+  I2S.setPins(
+    I2S_BCLK,
+    I2S_LRC,
+    I2S_DIN,
+    I2S_MIC_SD
+  );
+
+  if (!I2S.begin(
+        I2S_MODE_STD,
+        SAMPLE_RATE,
+        I2S_DATA_BIT_WIDTH_32BIT,
+        I2S_SLOT_MODE_STEREO
+      )) {
+    // Keep the speaker (and the robot) up when the RX half is refused; the mic
+    // task sees no RX channel and stays off.
+    serialLogPrintln("I2S full duplex failed; retrying speaker only (mic off)");
+    I2S.end();
+    I2S.setPins(I2S_BCLK, I2S_LRC, I2S_DIN);
+    return I2S.begin(
+      I2S_MODE_STD,
+      SAMPLE_RATE,
+      I2S_DATA_BIT_WIDTH_32BIT,
+      I2S_SLOT_MODE_STEREO
+    );
+  }
+
+  // INMP441 SD is tri-state outside its slot (and floats when no mic is fitted):
+  // pull it down so a missing mic reads a constant 0.
+  gpio_pullup_dis(static_cast<gpio_num_t>(I2S_MIC_SD));
+  gpio_pulldown_en(static_cast<gpio_num_t>(I2S_MIC_SD));
+  return true;
+}
+
 void writeMonoToSpeaker(const int16_t* samples, size_t count) {
-  constexpr size_t FRAMES = 256;
-
-  int16_t buffer[FRAMES * 2];
-
   const uint8_t volume = settingsVolume();
 
   while (count > 0) {
-    const size_t framesThisTime = count < FRAMES ? count : FRAMES;
+    const size_t framesThisTime = count < kSpeakerFrames ? count : kSpeakerFrames;
 
-    for (size_t i = 0; i < framesThisTime; i++) {
-      int32_t scaled = (static_cast<int32_t>(samples[i]) * volume) / 100;
-
-      if (scaled > 32767) {
-        scaled = 32767;
-      } else if (scaled < -32768) {
-        scaled = -32768;
-      }
-
-      buffer[i * 2] = static_cast<int16_t>(scaled);
-      buffer[i * 2 + 1] = static_cast<int16_t>(scaled);
-    }
-
-    I2S.write(
-      reinterpret_cast<uint8_t*>(buffer),
-      framesThisTime * 2 * sizeof(int16_t)
-    );
+    i2sPackMonoToStereo32(samples, framesThisTime, volume, g_speakerFrames);
+    writeSpeakerFrames(framesThisTime);
 
     samples += framesThisTime;
     count -= framesThisTime;
@@ -133,10 +170,6 @@ void playTone(
   float frequency,
   int durationMs
 ) {
-  constexpr int FRAMES = 512;
-
-  int16_t buffer[FRAMES * 2];
-
   float phase = 0.0f;
 
   const float phaseStep =
@@ -153,15 +186,16 @@ void playTone(
   while (framesPlayed < totalFrames) {
     const int framesThisTime =
       min(
-        FRAMES,
+        static_cast<int>(kSpeakerFrames),
         totalFrames - framesPlayed
       );
 
     for (int i = 0; i < framesThisTime; i++) {
-      const int16_t sample =
+      const int32_t slot = i2sSlotFromSample(
         (int16_t)(
           sin(phase) * amplitude
-        );
+        )
+      );
 
       phase += phaseStep;
 
@@ -169,44 +203,32 @@ void playTone(
         phase -= 2.0f * PI;
       }
 
-      buffer[i * 2] = sample;
-      buffer[i * 2 + 1] = sample;
+      g_speakerFrames[i * 2] = slot;
+      g_speakerFrames[i * 2 + 1] = slot;
     }
 
-    I2S.write(
-      (uint8_t*)buffer,
-      framesThisTime *
-      2 *
-      sizeof(int16_t)
-    );
+    writeSpeakerFrames(framesThisTime);
 
     framesPlayed += framesThisTime;
   }
 }
 
 void playSilence(int durationMs) {
-  constexpr int FRAMES = 512;
-
-  int16_t buffer[FRAMES * 2] = {0};
-
   const int totalFrames =
     SAMPLE_RATE * durationMs / 1000;
 
   int framesPlayed = 0;
 
+  memset(g_speakerFrames, 0, sizeof(g_speakerFrames));
+
   while (framesPlayed < totalFrames) {
     const int framesThisTime =
       min(
-        FRAMES,
+        static_cast<int>(kSpeakerFrames),
         totalFrames - framesPlayed
       );
 
-    I2S.write(
-      (uint8_t*)buffer,
-      framesThisTime *
-      2 *
-      sizeof(int16_t)
-    );
+    writeSpeakerFrames(framesThisTime);
 
     framesPlayed += framesThisTime;
   }

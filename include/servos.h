@@ -58,6 +58,18 @@ inline float servoDegToNorm(float deg, float savedMin, float savedMax) {
   return servoSaturateNorm(2.0f * (deg - savedMin) / span - 1.0f);
 }
 
+// Compile-time hard caps (degrees). Nothing at runtime may exceed them: soft
+// limits, POST /ranges and POST /ranges/explore all stay inside. They sit 10°
+// inside the 0–180° electrical clamp (800–2200 us), where cheap micro servos hit
+// their internal end stops and stall. The setup-AP wizard keeps its own 0–180°
+// path for supervised assembly and calibration; a saved range past these caps
+// is clamped to them at runtime. Widen only after testing on a real robot.
+constexpr float SERVO_HARD_MIN_DEG[SERVO_COUNT] = {10.0f, 10.0f, 10.0f, 10.0f, 10.0f};
+constexpr float SERVO_HARD_MAX_DEG[SERVO_COUNT] = {170.0f, 170.0f, 170.0f, 170.0f, 170.0f};
+
+// POST /ranges: smallest accepted max - min per joint.
+constexpr float SERVO_RANGE_MIN_SPAN_DEG = 6.0f;
+
 // Max commanded slew rate for all smooth moves
 constexpr float SERVO_MAX_SPEED_DEG_S = 140.0f;
 

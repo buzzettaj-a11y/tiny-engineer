@@ -29,6 +29,10 @@ SettingsValues SettingsValues::defaults() {
 
   strlcpy(values.rgbOrder, SETTINGS_DEFAULT_RGB_ORDER, sizeof(values.rgbOrder));
   values.oledRotate180 = SETTINGS_DEFAULT_OLED_ROTATE_180;
+  strlcpy(values.brainHost, SETTINGS_DEFAULT_BRAIN_HOST, sizeof(values.brainHost));
+  values.brainPort = SETTINGS_DEFAULT_BRAIN_PORT;
+  values.bumpThresholdMa = SETTINGS_DEFAULT_BUMP_THRESHOLD_MA;
+  values.micShift = SETTINGS_DEFAULT_MIC_SHIFT;
   return values;
 }
 
@@ -40,6 +44,9 @@ void SettingsValues::apply(const SettingsPatch& patch) {
   continuousTimeoutMin = patch.continuousTimeoutMin.value_or(continuousTimeoutMin);
   servoRanges = patch.servoRanges.value_or(servoRanges);
   oledRotate180 = patch.oledRotate180.value_or(oledRotate180);
+  brainPort = patch.brainPort.value_or(brainPort);
+  bumpThresholdMa = patch.bumpThresholdMa.value_or(bumpThresholdMa);
+  micShift = patch.micShift.value_or(micShift);
 
   if (patch.hostname != nullptr) {
     strlcpy(hostname, patch.hostname, sizeof(hostname));
@@ -64,6 +71,10 @@ void SettingsValues::apply(const SettingsPatch& patch) {
   if (patch.rgbOrder != nullptr) {
     strlcpy(rgbOrder, patch.rgbOrder, sizeof(rgbOrder));
   }
+
+  if (patch.brainHost != nullptr) {
+    strlcpy(brainHost, patch.brainHost, sizeof(brainHost));
+  }
 }
 
 void SettingsValues::log(const char* prefix) const {
@@ -72,14 +83,14 @@ void SettingsValues::log(const char* prefix) const {
   }
 
   const ServoRanges& r = servoRanges;
-  char line[384];
+  char line[512];
   snprintf(
     line,
     sizeof(line),
     "%s sleep_timeout=%umin hostname=%s volume=%u welcome=%s serial_log=on "
     "continuous_timeout=%umin loading=%s eyes_style=%s access_token=%s "
     "link_mode=%s wifi_networks=%u servos=%u-%u;%u-%u;%u-%u;%u-%u;%u-%u rgb_order=%s "
-    "oled_rotate_180=%s",
+    "oled_rotate_180=%s brain_host=%s brain_port=%u bump_threshold_ma=%u mic_shift=%u",
     prefix,
     static_cast<unsigned>(sleepTimeoutMin),
     hostname,
@@ -94,7 +105,11 @@ void SettingsValues::log(const char* prefix) const {
     r.mins[0], r.maxs[0], r.mins[1], r.maxs[1], r.mins[2], r.maxs[2], r.mins[3], r.maxs[3],
     r.mins[4], r.maxs[4],
     rgbOrder,
-    oledRotate180 ? "on" : "off"
+    oledRotate180 ? "on" : "off",
+    brainHost[0] != '\0' ? brainHost : "(none)",
+    static_cast<unsigned>(brainPort),
+    static_cast<unsigned>(bumpThresholdMa),
+    static_cast<unsigned>(micShift)
   );
   serialLogPrintln(line);
 }
