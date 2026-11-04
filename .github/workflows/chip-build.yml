@@ -18,6 +18,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,7 +48,7 @@ jobs:
           step() {  # step <name> <command...>
             local name="$1"; shift
             echo "::group::$name"
-            ( "$@" ) > "out/$name.log" 2>&1
+            ( timeout 900 "$@" ) > "out/$name.log" 2>&1
             local rc=$?
             tail -n 60 "out/$name.log"
             echo "::endgroup::"
