@@ -1,0 +1,6 @@
+chip.toml
+chip_state.json
+chip_state.tmp
+voices/
+__pycache__/
+.pytest_cache/

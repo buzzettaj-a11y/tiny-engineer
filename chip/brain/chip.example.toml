@@ -1,0 +1,96 @@
+# Chip brain settings. Copy to chip.toml and edit the [robot] section.
+# Every value below is the default; delete lines you don't change.
+# The Anthropic API key is NOT here: set the ANTHROPIC_API_KEY environment variable.
+
+[robot]
+url = "http://192.168.86.223"   # the robot's address (shown on its screen)
+token = ""                      # robot access_token, if you set one in its web panel
+health_poll_s = 30.0
+anim_stale_s = 8.0              # a queued animation older than this is skipped
+
+[brain]
+http_host = "0.0.0.0"           # hooks from the VMs arrive here (via Tailscale)
+http_port = 47101
+udp_port = 47100                # the robot streams its mic here
+token = ""                      # optional: VMs must send it (install.js --token)
+state_file = "chip_state.json"  # explored joint ranges are remembered here
+log_level = "INFO"              # DEBUG for more detail
+
+[audio]
+vad = "auto"                    # auto | energy | webrtc (auto uses webrtcvad if installed)
+webrtc_aggressiveness = 2       # 0..3, higher = stricter
+end_silence_ms = 600            # this much silence ends a sentence
+min_speech_ms = 300             # shorter sounds are noise, not speech
+max_segment_s = 15.0
+preroll_ms = 300
+prefix_s = 1.2                  # early "is that my name?" check after this much speech
+energy_margin_db = 10.0         # speech must be this much louder than the room
+min_speech_dbfs = -50.0
+loud_sound_dbfs = -14.0         # a short bang louder than this makes Chip glance at you
+max_gap_fill_packets = 40
+
+[wake]
+words = ["chip", "chipp", "chips", "chipper", "chippy"]
+# Sound-alikes that only count right after a greeting ("hey ship"), so
+# "ship it" or "cheap flights" never wake Chip.
+words_after_greeting = ["ship", "chap", "chop", "cheap", "jip", "chet", "tip", "trip"]
+greetings = ["hey", "hi", "okay", "ok", "hay", "yo", "oh", "hello"]
+max_position = 2                # name must be the 1st word (or 2nd after "um")
+follow_up_s = 8.0               # after Chip talks, reply without saying "Chip"
+ack = "Yes?"                    # said when you only say "Chip". "" = just look up
+openwakeword_model = ""         # optional: path to a trained openWakeWord "chip" model
+openwakeword_threshold = 0.5
+
+[stt]
+model = "base.en"               # tiny.en is faster, small.en more accurate
+device = "cpu"                  # "cuda" if you have an NVIDIA GPU + CUDA libs
+compute_type = "int8"
+initial_prompt = "Talking to Chip, a desk robot."  # don't start it with "Chip" (Whisper may echo it)
+beam_size = 1
+
+[claude]
+model = "claude-sonnet-5-5"
+fast_model = ""                 # e.g. "claude-haiku-5-5": used for short small talk
+max_tokens = 300
+history_turns = 6
+max_tool_rounds = 4
+owner_name = "Joe"
+
+[tts]
+backend = "auto"                # auto | piper | sapi | none
+piper_model = ""                # e.g. "voices/en_US-lessac-medium.onnx" (+ .onnx.json next to it)
+piper_exe = ""                  # e.g. "C:/piper/piper.exe" if the pip package won't install
+sapi_voice = ""                 # part of a Windows voice name, e.g. "Zira" or "David"
+sapi_rate = 1                   # -10..10
+volume = 1.0                    # 0..2
+
+[focus]
+auto_switch_idle_s = 120.0      # auto focus leaves a session only after 2 min idle
+heads_up = true                 # "Heads up, X is waiting for you."
+heads_up_session_interval_s = 300.0
+heads_up_global_interval_s = 30.0
+forget_ended_after_s = 1800.0
+forget_idle_after_s = 43200.0
+
+[ranges]
+enabled = true                  # learn from bumps (needs the INA219 current sensor)
+poll_s = 30.0
+bump_count = 2                  # this many bumps...
+bump_window_s = 600.0           # ...within 10 minutes...
+near_limit_deg = 8.0            # ...this close to a saved limit tighten it
+min_span_deg = 12.0
+explore_max_gain_deg = 15.0     # "find your ranges" moves each limit at most this much per run
+explore_speed = 10
+adjust_max_deg = 20.0
+
+[idle]
+enabled = true
+min_idle_s = 60.0
+glance_min_s = 20.0
+glance_max_s = 90.0
+amplitude = 0.2                 # small moves (pose units, -1..1)
+stretch_after_task_s = 300.0    # stretch after a task that took 5+ minutes
+loud_glance_interval_s = 30.0
+night_start_hour = 23           # calmer and sleepier at night
+night_end_hour = 7
+look_at_joe_head = 0.25         # head pose that faces you; flip the sign if Chip looks down

@@ -1,0 +1,12 @@
+{
+  "name": "chip-hooks",
+  "private": true,
+  "description": "Claude Code hook forwarder + installer for the Chip brain (zero dependencies)",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
