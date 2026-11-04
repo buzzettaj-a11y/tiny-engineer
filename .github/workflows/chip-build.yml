@@ -1,0 +1,102 @@
+name: Chip build
+
+# Builds the `chip` branch and publishes logs + flashable binaries to the
+# `chip-builds` branch, so results can be read with plain git.
+
+on:
+  push:
+    branches: [chip]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: chip-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+            .pio
+          key: ${{ runner.os }}-chip-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-chip-pio-
+      - name: Install PlatformIO
+        run: pip install -U platformio
+
+      - name: Build and test (never stops early; results recorded)
+        shell: bash
+        run: |
+          mkdir -p out
+          step() {  # step <name> <command...>
+            local name="$1"; shift
+            echo "::group::$name"
+            ( "$@" ) > "out/$name.log" 2>&1
+            local rc=$?
+            tail -n 60 "out/$name.log"
+            echo "::endgroup::"
+            echo "$name=$rc" >> out/status.txt
+            return 0
+          }
+          step firmware pio run
+          step littlefs pio run -t buildfs
+          step native-tests pio test -e native
+          step ui-install npm ci --prefix ui
+          step ui-lint npm run lint --prefix ui
+          step ui-test npm test --prefix ui
+          step cli-tests bash -c "npm ci --prefix packages/tiny-engineer-cli && npm test --prefix packages/tiny-engineer-cli"
+          if [ -f chip/brain/requirements-test.txt ]; then
+            step brain-install pip install -r chip/brain/requirements-test.txt
+          fi
+          if [ -d chip/brain ]; then
+            step brain-tests bash -c "cd chip/brain && python -m pytest -q"
+          fi
+          if [ -d chip/hooks ]; then
+            step hook-tests bash -c "cd chip/hooks && node --test"
+          fi
+          cat out/status.txt
+
+      - name: Stage binaries
+        if: always()
+        shell: bash
+        run: |
+          B=.pio/build/esp32-c3-devkitm-1
+          for f in bootloader partitions firmware littlefs; do
+            [ -f "$B/$f.bin" ] && cp "$B/$f.bin" "out/chip-$f.bin"
+          done
+          {
+            echo "source_sha=${GITHUB_SHA}"
+            echo "run_url=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "offsets: bootloader=0x0 partitions=0x8000 firmware=0x10000 littlefs=0x220000"
+          } > out/info.txt
+          ls -la out
+
+      - name: Publish to chip-builds branch
+        if: always()
+        shell: bash
+        run: |
+          cd out
+          git init -q
+          git config user.name "chip-build"
+          git config user.email "chip-build@users.noreply.github.com"
+          git checkout -q -b chip-builds
+          git add -A
+          git commit -q -m "chip build of ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" chip-builds
