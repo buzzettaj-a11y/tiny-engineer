@@ -12,7 +12,7 @@ const float kSavedMaxs[SERVO_COUNT] = {140, 130, 120, 110, 100};
 
 SoftLimits freshLimits() {
   SoftLimits soft{};
-  soft.reset(kSavedMins, kSavedMaxs, SERVO_HARD_MIN_DEG, SERVO_HARD_MAX_DEG);
+  soft.reset(kSavedMins, kSavedMaxs);
   return soft;
 }
 
@@ -37,21 +37,20 @@ void test_reset_soft_equals_saved_inside_hard() {
   }
 }
 
-void test_reset_clamps_saved_past_hard() {
+void test_reset_keeps_saved_past_hard_caps() {
+  // Stock behaviour: the runtime clamp is the saved calibration, even when the
+  // setup wizard saved it wider than the hard caps.
   const float mins[SERVO_COUNT] = {0, 5, 10, 20, 175};
   const float maxs[SERVO_COUNT] = {180, 175, 170, 160, 180};
   SoftLimits soft{};
-  soft.reset(mins, maxs, SERVO_HARD_MIN_DEG, SERVO_HARD_MAX_DEG);
+  soft.reset(mins, maxs);
 
-  TEST_ASSERT_EQUAL_FLOAT(10, soft.mins[0]);
-  TEST_ASSERT_EQUAL_FLOAT(170, soft.maxs[0]);
-  TEST_ASSERT_EQUAL_FLOAT(10, soft.mins[1]);
-  TEST_ASSERT_EQUAL_FLOAT(170, soft.maxs[1]);
-  TEST_ASSERT_EQUAL_FLOAT(20, soft.mins[3]);
-  TEST_ASSERT_EQUAL_FLOAT(160, soft.maxs[3]);
-  // Wholly outside: collapses onto the nearest cap.
-  TEST_ASSERT_EQUAL_FLOAT(170, soft.mins[4]);
-  TEST_ASSERT_EQUAL_FLOAT(170, soft.maxs[4]);
+  for (int i = 0; i < SERVO_COUNT; i++) {
+    TEST_ASSERT_EQUAL_FLOAT(mins[i], soft.mins[i]);
+    TEST_ASSERT_EQUAL_FLOAT(maxs[i], soft.maxs[i]);
+  }
+  TEST_ASSERT_EQUAL_FLOAT(3, soft.clamp(0, 3));
+  TEST_ASSERT_EQUAL_FLOAT(178, soft.clamp(0, 178));
 }
 
 void test_clamp() {
@@ -177,7 +176,7 @@ int main() {
   UNITY_BEGIN();
   RUN_TEST(test_hard_caps_inside_electrical_clamp);
   RUN_TEST(test_reset_soft_equals_saved_inside_hard);
-  RUN_TEST(test_reset_clamps_saved_past_hard);
+  RUN_TEST(test_reset_keeps_saved_past_hard_caps);
   RUN_TEST(test_clamp);
   RUN_TEST(test_bump_narrows_max_two_degrees_inside);
   RUN_TEST(test_bump_narrows_min_two_degrees_inside);

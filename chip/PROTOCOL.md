@@ -108,9 +108,14 @@ delay) so servo noise stays off the mic. Eyes attentive/wide. Allowed as a
 * `saved_*`: the NVS calibration (what animations use).
 * `soft_*`: runtime limits after bumps (RAM only, start = saved). Animations and
   `/pose` are clamped to soft limits.
-* `hard_*`: compile-time caps nobody can exceed (in `include/servos.h`).
+* `hard_*`: compile-time caps (in `include/servos.h`, 10–170°) that bound
+  `POST /ranges` and `POST /ranges/explore`. They do **not** clamp the saved
+  calibration at runtime (stock behaviour for ranges saved by the setup wizard).
+* `current_ma` is `null` and `sensor` is `false` without an INA219 or while it
+  stops answering (5 failed reads in a row; retried once a second).
 * `bumps`: newest-first ring buffer (max 32) of
-  `{"t_ms":..,"joint":0..4,"angle":deg,"dir":"min"|"max","current_ma":..,"anim":"typing"}`.
+  `{"t_ms":..,"joint":0..4,"angle":deg,"dir":"min"|"max","current_ma":..,"anim":"typing","kind":"bump"|"stall"}`.
+  `angle` is the commanded angle when the current first crossed the threshold.
 
 ### `POST /ranges`
 `{"servo_mins":[..5],"servo_maxs":[..5]}` — saves new calibration **outside**
@@ -119,11 +124,18 @@ Resets soft limits to the new saved values. 400 with a reason otherwise.
 
 ### `POST /ranges/explore`
 `{"joint":0..4,"dir":"min"|"max","speed":10}` (speed 5–30 °/s, default 10).
-Blocking (like `/test/*`): stops animations, holds other joints, moves the joint
-slowly from its saved limit toward the hard limit until a bump or the hard limit,
-backs off 4°, returns
-`{"ok":true,"joint":j,"dir":"max","stopped_at":deg,"reason":"bump"|"hard_limit","safe":deg,"peak_ma":..}`.
-Does **not** save; the brain decides. 409 `no current sensor` without an INA219.
+Blocking (like `/test/*`, at most ~14 s): stops animations, holds other joints,
+learns the holding current, moves the joint to its saved limit, then slowly
+toward the hard limit. The sweep ends at a bump, the hard limit, **30° past the
+saved limit**, or 12 s, whichever comes first. Bump threshold while exploring:
+`min(bump_threshold_ma, 400)`. Backs off 4° from first contact, returns
+`{"ok":true,"joint":j,"dir":"max","stopped_at":deg,"reason":"bump"|"hard_limit"|"max_travel","safe":deg,"peak_ma":..}`.
+`max_travel` = stopped by the 30° / 12 s bound with nothing felt.
+Does **not** save; the brain decides. Errors: 409 `no current sensor` (no
+INA219), 409 `current sensor not responding`, 409 `implausible servo current;
+check INA219 VIN+/VIN- wiring` (holding current < 10 mA, negative, or > 1500 mA;
+nothing moved), 500 `current sensor failed during explore` (reads failed
+mid-run; the joint goes back to where it started).
 
 ### `POST /bumps/clear`
 Empties the bump list and resets soft limits to saved. `{"ok":true}`.
@@ -142,14 +154,23 @@ Empties the bump list and resets soft limits to saved. `{"ok":true}`.
 
 ## 5. Bump reflex (firmware, every ≤ 10 ms)
 
-1. Read INA219 current. Keep an idle baseline (EMA while no servo moves).
+1. Read INA219 current. "Moving" = motion commanded within the last 250 ms
+   (a joint slewing, a target change, or a `/pose` in flight). Keep an idle
+   baseline (EMA) per output state (powered / limp), learned only while nothing
+   moves, armed after 10 still samples, never fed samples above
+   `baseline + threshold/2` (a load between half and the full threshold is
+   learned after 2 s). Pause 400 ms after released outputs switch back on.
 2. A **bump** is current above `baseline + bump_threshold_ma` for **≥ 60 ms**
-   while at least one servo is moving.
-3. On a bump: stop every moving joint where it is, move each moving joint back
-   **4°** toward its mid at normal speed, set that joint's soft limit in the
-   direction it was travelling to `angle − 2°` (never past saved mid), log a
-   bump entry per moving joint, and put the animation in `none`.
-4. Ignore bumps for 500 ms after a bump.
+   while moving, or ≥ 2500 mA at once. A **stall** is the same excess for
+   **≥ 300 ms** with powered servos and no motion.
+3. On either: stop every joint where it is, and for each joint that moved in
+   the last 250 ms (stall: ~2 s) take its commanded angle from when the current
+   first crossed the threshold, move it back **4°** against its travel direction
+   at normal speed (not past saved mid on an outward move), set its soft limit on
+   that side to `angle − 2°` (never past saved mid), log an entry per joint
+   (`kind` `bump`/`stall`), and put the animation in `none`. A stall with no
+   recently moved joint switches all servo outputs off.
+4. Ignore events for 500 ms after one. Off when the INA219 stops answering.
 
 The reflex never widens anything. Only `POST /ranges` (validated) can.
 

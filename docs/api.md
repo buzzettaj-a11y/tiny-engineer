@@ -101,7 +101,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://tiny-engineer.local/health
 | `mic.present` | INMP441 data seen (non-constant samples) since boot; `false` without a mic |
 | `mic.muted` | Mic muted (button on GP7 or [`POST /mic`](#post-mic)); saved in NVS |
 | `mic.streaming` | UDP mic packets are reaching the network stack ([Mic stream](#mic-stream-udp)) |
-| `current_ma` | Servo-rail current from the optional INA219 (mA, one decimal), or `null` without the sensor |
+| `current_ma` | Servo-rail current from the optional INA219 (mA, one decimal), or `null` without the sensor or while it stops answering (5 failed reads in a row; retried once a second) |
 | `bumps` | Entries in the bump log ([`GET /ranges`](#get-ranges)) |
 
 ### `GET /settings`
@@ -497,7 +497,7 @@ Wrong fields return **400** and do not move any servo:
 | `invalid index` | `index` missing, not an integer, or outside `0`–`4` |
 | `invalid angle` | `angle` missing, not a number, or outside `0`–`180` |
 
-Assembled robot: firmware clamps to the soft limits — the NVS min/max from setup, kept inside the hard caps and narrowed by bumps (see [`GET /ranges`](#get-ranges); stock defaults in [robot-movement.md](robot-movement.md)); this route still accepts 0–180 and clamps. For unclamped assembly moves, use setup AP `POST /setup/servo`.
+Assembled robot: firmware clamps to the soft limits — the NVS min/max from setup, narrowed by bumps (see [`GET /ranges`](#get-ranges); stock defaults in [robot-movement.md](robot-movement.md)); this route still accepts 0–180 and clamps. For unclamped assembly moves, use setup AP `POST /setup/servo`.
 
 ### `GET /anim`
 
@@ -650,7 +650,7 @@ curl http://tiny-engineer.local/mic
 
 ### `POST /mic`
 
-Mute or unmute. The momentary button on GP7 toggles the same state. JSON body.
+Mute or unmute. The momentary button on GP7 toggles the same state: its own task reads it every 5 ms (30 ms debounce), so a press is never lost to a busy loop, and the mic stream honours it on the very next packet. A `POST /mic` sets the state outright (presses before it are settled; presses after it toggle again). JSON body.
 
 | Field | Type | Range |
 | --- | --- | --- |
@@ -711,7 +711,7 @@ curl http://tiny-engineer.local/ranges
   "sensor": true,
   "bump_threshold_ma": 650,
   "bumps": [
-    { "t_ms": 812345, "joint": 0, "angle": 130.2, "dir": "max", "current_ma": 980.1, "anim": "typing" }
+    { "t_ms": 812345, "joint": 0, "angle": 130.2, "dir": "max", "current_ma": 980.1, "anim": "typing", "kind": "bump" }
   ]
 }
 ```
@@ -719,12 +719,12 @@ curl http://tiny-engineer.local/ranges
 | Field | Meaning |
 | --- | --- |
 | `saved_mins` / `saved_maxs` | NVS calibration `[head, neck, left, right, body]` in degrees; animations and `/pose` map `-1`–`1` onto it |
-| `soft_mins` / `soft_maxs` | Runtime limits (RAM only): saved clamped into the hard caps, narrowed by bumps. Animations, `/pose` and `/test/servo` are clamped to them. Reset to saved at boot, on `POST /ranges`, on `POST /bumps/clear`, and whenever the saved calibration changes |
-| `hard_mins` / `hard_maxs` | Compile-time caps (`SERVO_HARD_MIN_DEG` / `SERVO_HARD_MAX_DEG` in [`include/servos.h`](../include/servos.h)), 10°–170° on every joint. Nothing at runtime goes past them |
-| `current_ma` | Latest servo-rail current (mA), or `null` without an INA219 |
-| `sensor` | INA219 found at `0x41` at boot |
+| `soft_mins` / `soft_maxs` | Runtime limits (RAM only): start equal to saved, narrowed by bumps. Animations, `/pose` and `/test/servo` are clamped to them. Reset to saved at boot, on `POST /ranges`, on `POST /bumps/clear`, and whenever the saved calibration changes |
+| `hard_mins` / `hard_maxs` | Compile-time caps (`SERVO_HARD_MIN_DEG` / `SERVO_HARD_MAX_DEG` in [`include/servos.h`](../include/servos.h)), 10°–170° on every joint. `POST /ranges` must stay inside them and `POST /ranges/explore` never drives past them. They do not clamp the saved calibration at runtime (a wider range saved by the setup wizard keeps working as before) |
+| `current_ma` | Latest servo-rail current (mA), or `null` without a working INA219 |
+| `sensor` | INA219 found at `0x41` at boot **and** still answering; `false` after 5 failed reads in a row (bump reflex off, explore refused) until a read succeeds again |
 | `bump_threshold_ma` | Same as the setting |
-| `bumps` | Newest first, at most 32 (RAM only): bump time (`millis()`), joint, angle where it happened (degrees), travel direction, peak current of the bump window (mA), and the animation that was running |
+| `bumps` | Newest first, at most 32 (RAM only): event time (`millis()`), joint, commanded angle when the current first crossed the threshold (degrees), travel direction, peak current of the event window (mA), the animation that was running, and `kind`: `bump` (while moving) or `stall` (high current after the move ended) |
 
 ### `POST /ranges`
 
@@ -751,7 +751,7 @@ Reply: same JSON as `GET /ranges`. Soft limits reset to the new saved values; th
 
 ### `POST /ranges/explore`
 
-Probe how far one joint can really go. **Blocking** (like `/test/*`): stops the animation and any `/pose` move, holds the other joints where they are (PWM on), moves the joint at 40°/s to its saved limit in that direction, then moves it slowly toward the hard cap until a bump or the cap. It then backs off 4° toward mid and returns the joint inside its soft limits. **Saves nothing**; the brain decides what to keep with `POST /ranges`. Needs the INA219. JSON body.
+Probe how far one joint can really go. **Blocking** (like `/test/*`, at most ~14 s): stops the animation and any `/pose` move, holds the other joints where they are (PWM on), learns the holding current for 300 ms, moves the joint at 60°/s to its saved limit in that direction, then moves it slowly toward the hard cap. The sweep ends at the first of: a bump, the hard cap, **30°** past the saved limit, or 12 s since the start. The joint then backs off 4° from the angle of first contact and returns inside its soft limits. **Saves nothing**; the brain decides what to keep with `POST /ranges`. Needs a working INA219. JSON body.
 
 | Field | Type | Range |
 | --- | --- | --- |
@@ -765,22 +765,25 @@ curl -X POST "http://tiny-engineer.local/ranges/explore" -H "Content-Type: appli
 ```
 
 ```json
-{ "ok": true, "joint": 0, "dir": "max", "stopped_at": 151.3, "reason": "bump", "safe": 147.3, "peak_ma": 1042.5 }
+{ "ok": true, "joint": 0, "dir": "max", "stopped_at": 151.3, "reason": "bump", "safe": 146.1, "peak_ma": 1042.5 }
 ```
 
 | Field | Meaning |
 | --- | --- |
 | `stopped_at` | Angle (degrees) where the joint stopped |
-| `reason` | `bump` (current over the baseline + threshold for 60 ms) or `hard_limit` (reached the hard cap) |
-| `safe` | `stopped_at` backed off 4° toward the saved mid (degrees, inside the hard caps) |
+| `reason` | `bump` (current over the baseline + threshold for 60 ms, or ≥ 2500 mA at once), `hard_limit` (reached the hard cap), or `max_travel` (stopped 30° past the saved limit, or by the 12 s time limit, before anything was felt) |
+| `safe` | Angle 4° back toward the saved mid from first contact (for `bump`) or from `stopped_at` (degrees, inside the hard caps) |
 | `peak_ma` | Highest servo-rail current while moving (mA) |
 
-The bump test uses `bump_threshold_ma`, or the default 650 mA when the setting is `0`. Explore bumps do not enter the bump log or change the soft limits.
+The bump threshold while exploring is `min(bump_threshold_ma, 400)` (400 when the setting is `0`). Explore bumps do not enter the bump log or change the soft limits.
 
 | Status | `error` | When |
 | --- | --- | --- |
 | `400` | `invalid joint` / `invalid dir` / `invalid speed` | Field missing (except `speed`) or out of range |
-| `409` | `no current sensor` | No INA219 at `0x41` |
+| `409` | `no current sensor` | No INA219 at `0x41` at boot |
+| `409` | `current sensor not responding` | The INA219 stopped answering (see `sensor` in [`GET /ranges`](#get-ranges)) |
+| `409` | `implausible servo current; check INA219 VIN+/VIN- wiring` | Holding current after the settle is below 10 mA (or negative) or above 1500 mA: the shunt is reversed or not in the servo lead. Nothing moved |
+| `500` | `current sensor failed during explore` | 5 current reads in a row failed mid-run; the joint returns to where it started |
 | `503` | `busy` | A serial `/play` stream holds the robot |
 
 ### `POST /bumps/clear`
@@ -797,14 +800,21 @@ curl -X POST "http://tiny-engineer.local/bumps/clear"
 
 ### Bump reflex
 
-With an INA219 at `0x41` (servo rail current, [interfaces](hardware/interfaces.md#i2c)), the firmware reads the current every loop tick (at most every 5 ms; ticks run every 10–20 ms while the OLED redraws) and keeps an idle baseline (exponential average while no servo moves). A **bump** is current above `baseline + bump_threshold_ma` for **≥ 60 ms** while at least one servo is moving. On a bump the firmware:
+With an INA219 at `0x41` (servo rail current, [interfaces](hardware/interfaces.md#i2c)), the firmware reads the current every loop tick (at most every 5 ms; ticks run every 10–20 ms while the OLED redraws).
+
+- **Moving** means motion was commanded in the last **250 ms**: a joint slewing toward its target, a target change (a slow `/pose` re-targets every tick), or a `/pose` move in flight. The tail covers servos that keep pushing after the commanded angle arrives.
+- **Baseline:** idle current, learned only while nothing moves, kept separately for powered and limp (PWM off) servos. A baseline counts after 10 still samples; until the powered one exists (shortly after boot) only the absolute trip guards moves. Samples above `baseline + bump_threshold_ma / 2` never feed it (a load between half and the full threshold is learned only after 2 s of stillness), and detection pauses for 400 ms after released outputs switch back on.
+- **Bump:** current above `baseline + bump_threshold_ma` for **≥ 60 ms** while moving, or ≥ 2500 mA at once.
+- **Stall:** current above `baseline + bump_threshold_ma` for **≥ 300 ms** with powered servos and no motion (a joint pressing into something after its move ended).
+
+On a bump or stall the firmware:
 
 1. Switches the animation to `none` (without the `none` park) and stops every joint where it is.
-2. Moves each joint that was moving 4° back against its travel direction at 25°/s (on an outward move it stops at the saved mid when closer than that).
-3. Sets that joint's soft limit on the side it was travelling to `angle − 2°` (`angle + 2°` for `min`), never past the saved mid and never wider than before.
-4. Logs one bump entry per moving joint ([`GET /ranges`](#get-ranges)).
+2. Blames the joints that moved in the last 250 ms (stall: the last ~2 s). For each, it takes the commanded angle from when the current **first** crossed the threshold (near first contact, not where the joint ran to), moves 4° back from it against the travel direction at 25°/s (on an outward move it stops at the saved mid when closer than that), and sets that side's soft limit to that angle ∓ 2°, never past the saved mid and never wider than before.
+3. Logs one entry per blamed joint ([`GET /ranges`](#get-ranges), `kind` `bump` or `stall`).
+4. A stall with no recently moved joint switches every servo output off instead.
 
-Further bumps are ignored for 500 ms. The reflex never widens anything; only `POST /ranges` (validated) can. It is off in setup AP mode, with `bump_threshold_ma` = `0`, or without the sensor.
+Further events are ignored for 500 ms. The reflex never widens anything; only `POST /ranges` (validated) can. It is off in setup AP mode, with `bump_threshold_ma` = `0`, without the sensor, and while the sensor stops answering (5 failed reads in a row; it re-learns its baselines when reads come back).
 
 ### Mic stream (UDP)
 
@@ -818,7 +828,7 @@ With an INMP441 fitted and `brain_host` set, the robot streams the mic to `brain
 | 12 | 2 | `flags` uint16 LE: bit0 `muted`, bit1 `speaker` (any speaker audio playing, or ended < 300 ms ago), bit2 `moving` (any servo moving), bit3 `asleep` |
 | 14 | 2 | `n` uint16 LE, sample count (256; `0` for a heartbeat) |
 
-While muted: no audio, one heartbeat (`n = 0`, `muted` set) per second. The brain must discard audio with `speaker` set. A hostname in `brain_host` is resolved (DNS / mDNS) on the robot and re-resolved every 60 s; an IPv4 literal skips DNS. Samples are `saturate(slot >> mic_shift)` from the left 32-bit I2S slot (the INMP441 sends 24-bit data, MSB aligned).
+While muted: no audio, one heartbeat (`n = 0`, `muted` set) per second. The brain must discard audio with `speaker` set. A hostname in `brain_host` is resolved (DNS / mDNS, IPv4 only) by a separate task, so a slow lookup never stalls the mic reads or the mute button; it is retried every 5 s after a failure and refreshed every 60 s. An IPv4 literal skips DNS. Samples are `saturate(slot >> mic_shift)` from the left 32-bit I2S slot (the INMP441 sends 24-bit data, MSB aligned).
 
 ## Errors
 
@@ -827,8 +837,9 @@ While muted: no audio, one heartbeat (`n = 0`, `muted` set) per second. The brai
 | `400` | `{"ok":false,"error":"..."}` | Bad body or fields on `/settings`, `/settings/wifi`, `/test/servo`, `/setup/*`, `/mic`, `/pose`, `/ranges` or `/ranges/explore`, or bad `/anim` or `/play` params (see tables above) |
 | `401` | `{"ok":false,"error":"unauthorized"}` | Access token configured and `Authorization: Bearer` missing or wrong |
 | `404` | `{"ok":false,"error":"not found"}` | Unknown path |
-| `409` | `{"ok":false,"error":"no current sensor"}` | `POST /ranges/explore` without an INA219 |
+| `409` | `{"ok":false,"error":"..."}` | `POST /ranges/explore` without a working INA219, or with an implausible holding current |
 | `415` | `{"ok":false,"error":"..."}` | `/play` body is not a supported WAV |
+| `500` | `{"ok":false,"error":"current sensor failed during explore"}` | `POST /ranges/explore` lost the current sensor mid-run |
 | `503` | `{"ok":false,"error":"busy"}` | `POST /pose` or `POST /ranges/explore` while a serial `/play` stream holds the robot |
 | `405` | `{"ok":false,"error":"method not allowed"}` | Wrong method on any known path, web panel pages included |
 
@@ -842,7 +853,7 @@ Test handlers **block** until the test finishes. The client waits. After each te
 
 The onboard RGB LED follows the active animation (see [RGB LED](#rgb-led)).
 
-`/play` holds the connection until the clip ends. `POST /ranges/explore` blocks like the test routes (seconds, up to ~35 s at 5°/s).
+`/play` holds the connection until the clip ends. `POST /ranges/explore` blocks like the test routes (at most ~14 s).
 
 One request at a time — the Arduino `WebServer` is single-threaded. While `/play` streams, other requests wait.
 

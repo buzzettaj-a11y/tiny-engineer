@@ -273,6 +273,45 @@ void test_button_never_fires_when_floating_high() {
   }
 }
 
+void test_mute_state_pending_presses_toggle() {
+  uint32_t presses = 0;
+  uint32_t state = micPackMuteState(presses, false);
+  TEST_ASSERT_FALSE(micEffectiveMuted(state, presses));
+
+  // A press counted by the button task mutes at once, before the loop applies it.
+  presses++;
+  TEST_ASSERT_TRUE(micEffectiveMuted(state, presses));
+  presses++;
+  TEST_ASSERT_FALSE(micEffectiveMuted(state, presses));
+  presses++;
+  TEST_ASSERT_TRUE(micEffectiveMuted(state, presses));
+
+  // Loop applies: same effective state, nothing pending.
+  state = micPackMuteState(presses, micEffectiveMuted(state, presses));
+  TEST_ASSERT_TRUE(micStateMuted(state));
+  TEST_ASSERT_EQUAL_UINT32(presses, micStateApplied(state));
+  TEST_ASSERT_TRUE(micEffectiveMuted(state, presses));
+}
+
+void test_mute_state_explicit_set_settles_presses() {
+  uint32_t presses = 5;
+  uint32_t state = micPackMuteState(0, false);
+  TEST_ASSERT_TRUE(micEffectiveMuted(state, presses));  // 5 pending: odd
+  // POST /mic {"muted":false} wins over presses counted before it.
+  state = micPackMuteState(presses, false);
+  TEST_ASSERT_FALSE(micEffectiveMuted(state, presses));
+  // A press after it still toggles.
+  TEST_ASSERT_TRUE(micEffectiveMuted(state, presses + 1));
+}
+
+void test_mute_state_counter_wrap() {
+  const uint32_t applied = 0xFFFFFFFFu;
+  const uint32_t state = micPackMuteState(applied, true);
+  TEST_ASSERT_TRUE(micEffectiveMuted(state, applied));
+  TEST_ASSERT_FALSE(micEffectiveMuted(state, applied + 1u));  // wraps to 0
+  TEST_ASSERT_TRUE(micEffectiveMuted(state, applied + 2u));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_packet_constants_match_protocol);
@@ -291,5 +330,8 @@ int main() {
   RUN_TEST(test_speaker_tail);
   RUN_TEST(test_button_debounce_toggles_once_per_press);
   RUN_TEST(test_button_never_fires_when_floating_high);
+  RUN_TEST(test_mute_state_pending_presses_toggle);
+  RUN_TEST(test_mute_state_explicit_set_settles_presses);
+  RUN_TEST(test_mute_state_counter_wrap);
   return UNITY_END();
 }

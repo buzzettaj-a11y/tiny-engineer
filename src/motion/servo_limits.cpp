@@ -42,24 +42,10 @@ bool parseBumpDir(const char* text, BumpDir& out) {
   return false;
 }
 
-void SoftLimits::reset(
-  const float savedMins[SERVO_COUNT],
-  const float savedMaxs[SERVO_COUNT],
-  const float hardMins[SERVO_COUNT],
-  const float hardMaxs[SERVO_COUNT]
-) {
+void SoftLimits::reset(const float savedMins[SERVO_COUNT], const float savedMaxs[SERVO_COUNT]) {
   for (int i = 0; i < SERVO_COUNT; i++) {
-    float lo = clampf(savedMins[i], hardMins[i], hardMaxs[i]);
-    float hi = clampf(savedMaxs[i], hardMins[i], hardMaxs[i]);
-
-    if (lo > hi) {
-      const float mid = clampf((savedMins[i] + savedMaxs[i]) * 0.5f, hardMins[i], hardMaxs[i]);
-      lo = mid;
-      hi = mid;
-    }
-
-    mins[i] = lo;
-    maxs[i] = hi;
+    mins[i] = savedMins[i];
+    maxs[i] = savedMaxs[i];
   }
 }
 

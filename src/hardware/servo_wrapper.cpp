@@ -271,6 +271,10 @@ uint32_t servoOutputsLastWakeMs() {
   return g_lastOutputWakeMs;
 }
 
+bool servoOutputsReleased() {
+  return g_allOutputsReleased;
+}
+
 ServoWrapper& servoAt(int index) {
   return g_servos[index];
 }

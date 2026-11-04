@@ -81,6 +81,8 @@ void setServoParkHoldUntilReboot(bool hold);
 // millis() when a released PWM output was last switched back on (or boot).
 // A limp joint that drooped snaps back then, drawing a short current spike.
 uint32_t servoOutputsLastWakeMs();
+// True after releaseAllServoOutputs() until any output is switched on again.
+bool servoOutputsReleased();
 bool servoOutputsHoldActive();
 
 float clampElectricalAngle(float angle);

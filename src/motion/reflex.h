@@ -19,8 +19,9 @@ void servoSoftLimitsReset();
 // tickRobot(): reads the INA219 (at most every kCurrentPollMs) and runs the reflex.
 void motionTick(uint32_t nowMs);
 
+// INA219 found at boot and still reading (see ina219Healthy()).
 bool motionHasCurrentSensor();
-// Latest servo-rail current; false without a sensor or before the first read.
+// Latest servo-rail current; false without a working sensor or before the first read.
 bool motionCurrentMa(float& outMa);
 
 const BumpLog& motionBumps();
@@ -47,13 +48,16 @@ struct ExploreResult {
   int joint;
   BumpDir dir;
   float stoppedAt;
-  bool bumped;         // reason: "bump" when true, else "hard_limit"
+  const char* reason;  // "bump", "hard_limit" or "max_travel"
   float safe;
   float peakMa;
 };
 
-// Blocking. Stops animations, holds the other joints, drives `joint` from its
-// saved limit toward the hard cap at `speedDegS` until a bump or the cap, backs
-// off SERVO_BUMP_BACKOFF_DEG, then returns the joint inside its soft limits.
-// Saves nothing.
+// Blocking, at most ~14 s. Stops animations, holds the other joints, drives
+// `joint` to its saved limit, then toward the hard cap at `speedDegS` until a
+// bump, the hard cap, EXPLORE_MAX_EXCURSION_DEG past the saved limit or
+// EXPLORE_TIME_LIMIT_MS. Backs off SERVO_BUMP_BACKOFF_DEG from the first-contact
+// angle and returns the joint inside its soft limits. Saves nothing. Refuses
+// (409) without a working sensor or with an implausible holding current, and
+// aborts (500) when current reads fail mid-sweep.
 ExploreResult motionExplore(int joint, BumpDir dir, float speedDegS);

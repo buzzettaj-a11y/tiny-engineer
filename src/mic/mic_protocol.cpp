@@ -129,6 +129,24 @@ bool micSpeakerRecent(bool everWritten, uint32_t lastWriteMs, uint32_t nowMs, ui
   return static_cast<uint32_t>(nowMs - lastWriteMs) < tailMs;
 }
 
+uint32_t micPackMuteState(uint32_t appliedPresses, bool muted) {
+  return ((appliedPresses & 0x7FFFFFFFu) << 1) | (muted ? 1u : 0u);
+}
+
+bool micStateMuted(uint32_t state) {
+  return (state & 1u) != 0;
+}
+
+uint32_t micStateApplied(uint32_t state) {
+  return state >> 1;
+}
+
+bool micEffectiveMuted(uint32_t state, uint32_t presses) {
+  // Each pending press toggles once; only the parity matters (31-bit wrap is even).
+  const uint32_t pending = ((presses & 0x7FFFFFFFu) - micStateApplied(state)) & 1u;
+  return micStateMuted(state) != (pending != 0);
+}
+
 void MicPresence::feed(const int32_t* stereo, size_t frames) {
   if (present() || frames < 2) {
     return;

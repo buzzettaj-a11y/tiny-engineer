@@ -82,6 +82,15 @@ private:
   uint16_t value_ = 0;
 };
 
+// Mute state shared between tasks without read-modify-write atomics (the
+// ESP32-C3 has none). The button task only counts presses; the loop task is the
+// only writer of the packed state = (presses applied << 1) | muted. Any task
+// gets the effective mute, pending presses included, from one load of each.
+uint32_t micPackMuteState(uint32_t appliedPresses, bool muted);
+bool micStateMuted(uint32_t state);
+uint32_t micStateApplied(uint32_t state);
+bool micEffectiveMuted(uint32_t state, uint32_t presses);
+
 // Debounced momentary button. update() returns true once per press.
 class MicButton {
 public:

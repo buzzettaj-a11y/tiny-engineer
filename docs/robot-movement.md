@@ -19,10 +19,10 @@ Animations author poses in **−1..1** relative to each joint’s saved min/max 
 ## Saved, soft and hard limits
 
 - **Saved** — the NVS calibration above; poses map onto it.
-- **Hard** — compile-time caps `SERVO_HARD_MIN_DEG` / `SERVO_HARD_MAX_DEG` in [`include/servos.h`](../include/servos.h): **10°–170°** on every joint, inside the 0–180° electrical clamp. Runtime code never goes past them; a saved range wider than that (possible from the setup wizard) is clamped at runtime.
-- **Soft** — RAM-only limits that start equal to saved (clamped into hard). With the optional INA219 current sensor, a bump narrows the soft limit on the side the joint was travelling. Animations, `POST /pose` and `POST /test/servo` clamp to the soft limits. `POST /bumps/clear`, `POST /ranges` and a reboot reset them.
+- **Hard** — compile-time caps `SERVO_HARD_MIN_DEG` / `SERVO_HARD_MAX_DEG` in [`include/servos.h`](../include/servos.h): **10°–170°** on every joint, inside the 0–180° electrical clamp. `POST /ranges` must stay inside them and `POST /ranges/explore` never drives past them. They do not clamp the saved calibration at runtime: a wider range saved by the setup wizard behaves exactly as before.
+- **Soft** — RAM-only limits that start equal to saved. With the optional INA219 current sensor, a bump or stall narrows the soft limit on the side the joint was travelling. Animations, `POST /pose` and `POST /test/servo` clamp to the soft limits. `POST /bumps/clear`, `POST /ranges` and a reboot reset them.
 
-`POST /ranges` saves a new calibration outside setup mode (inside the hard caps, span ≥ 6°) and `POST /ranges/explore` probes one joint toward its hard cap until it bumps — [api.md](api.md#get-ranges).
+`POST /ranges` saves a new calibration outside setup mode (inside the hard caps, span ≥ 6°) and `POST /ranges/explore` probes one joint toward its hard cap (at most 30° past the saved limit) until it bumps — [api.md](api.md#get-ranges).
 
 Command a single joint for bench checks:
 

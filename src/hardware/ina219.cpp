@@ -16,6 +16,8 @@ constexpr uint32_t kConfigCheckMs = 1000;
 
 bool g_present = false;
 uint32_t g_lastConfigCheckMs = 0;
+Ina219Health g_health;
+bool g_loggedHealthy = true;
 
 bool writeRegister(uint8_t reg, uint16_t value) {
   Wire.beginTransmission(INA219_ADDRESS);
@@ -95,16 +97,35 @@ bool ina219Present() {
   return g_present;
 }
 
+bool ina219Healthy() {
+  return g_present && g_health.healthy();
+}
+
 bool ina219ReadCurrentMa(float& outMa) {
-  if (!g_present) {
+  const uint32_t now = millis();
+
+  if (!g_present || !g_health.shouldTry(now)) {
     return false;
   }
 
-  checkConfig(millis());
+  if (g_health.healthy()) {
+    checkConfig(now);
+  } else {
+    // Coming back after a loss (e.g. power cycled): configure first.
+    configure();
+  }
 
   uint16_t raw = 0;
+  const bool ok = readRegister(INA219_REG_SHUNT_VOLTAGE, raw);
+  g_health.onRead(ok, now);
 
-  if (!readRegister(INA219_REG_SHUNT_VOLTAGE, raw)) {
+  if (g_health.healthy() != g_loggedHealthy) {
+    g_loggedHealthy = g_health.healthy();
+    serialLogPrintln(g_loggedHealthy ? "[ina219] reads OK again; bump reflex back on"
+                                     : "[ina219] reads failing; bump reflex off");
+  }
+
+  if (!ok) {
     return false;
   }
 

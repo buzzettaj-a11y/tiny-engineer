@@ -9,8 +9,9 @@
 // Pure logic, no Arduino dependencies (host-tested).
 //
 // saved: NVS calibration; animations map poses -1..1 onto it.
-// soft:  RAM-only limits that bumps narrow; animations and /pose clamp to them.
-// hard:  compile-time caps in servos.h; nothing exceeds them.
+// soft:  RAM-only limits, start = saved, that bumps narrow; animations, /pose
+//        and /test/servo clamp to them.
+// hard:  compile-time caps in servos.h for POST /ranges and explore.
 
 enum class BumpDir : uint8_t {
   Min,
@@ -30,14 +31,9 @@ struct SoftLimits {
   float mins[SERVO_COUNT];
   float maxs[SERVO_COUNT];
 
-  // Soft = saved clamped into hard. A saved range wholly outside the hard caps
-  // collapses to the hard cap nearest to it.
-  void reset(
-    const float savedMins[SERVO_COUNT],
-    const float savedMaxs[SERVO_COUNT],
-    const float hardMins[SERVO_COUNT],
-    const float hardMaxs[SERVO_COUNT]
-  );
+  // Soft = saved. The hard caps do not clamp the saved calibration at runtime
+  // (stock behaviour); they only bound POST /ranges and explore.
+  void reset(const float savedMins[SERVO_COUNT], const float savedMaxs[SERVO_COUNT]);
 
   float clamp(int joint, float deg) const;
 

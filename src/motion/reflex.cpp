@@ -11,6 +11,7 @@
 #include "hardware/activity.h"
 #include "hardware/ina219.h"
 #include "hardware/servo_wrapper.h"
+#include "motion/explore_logic.h"
 #include "motion/pose_move.h"
 #include "network/wifi_connect.h"
 #include "serial_log.h"
@@ -25,11 +26,13 @@ constexpr uint32_t kCurrentPollMs = 5;
 // Skip detection this long after a released servo output switches back on:
 // a joint that drooped while limp snaps back with a short current spike.
 constexpr uint32_t kOutputWakeIgnoreMs = 400;
+// A stall is blamed on joints that moved within this window.
+constexpr uint32_t kStallBlameMs = BUMP_MOTION_TAIL_MS + BUMP_STALL_MS + 1500;
 // Bump back-off and explore return moves.
 constexpr float kBackoffSpeedDegS = anim::TRANSITION_TORSO_SPEED_DEG_S;
 // Explore: move to the saved limit at this speed, then sweep at the asked speed.
-constexpr float kExploreApproachSpeedDegS = 40.0f;
-constexpr float kExploreReturnSpeedDegS = 20.0f;
+constexpr float kExploreApproachSpeedDegS = 60.0f;
+constexpr float kExploreReturnSpeedDegS = 30.0f;
 constexpr uint32_t kExploreSettleMs = 300;
 constexpr uint32_t kExploreStepMs = 10;
 
@@ -39,10 +42,12 @@ float g_syncedMaxs[SERVO_COUNT] = {};
 bool g_softSynced = false;
 
 BumpDetector g_detector;
+MotionTracker g_motion;
 BumpLog g_bumps;
 uint32_t g_lastReadMs = 0;
 bool g_currentValid = false;
 float g_currentMa = 0.0f;
+bool g_sensorWasHealthy = true;
 
 void resetSoftFromSaved() {
   for (int i = 0; i < SERVO_COUNT; i++) {
@@ -50,7 +55,7 @@ void resetSoftFromSaved() {
     g_syncedMaxs[i] = settingsServoMax(i);
   }
 
-  g_soft.reset(g_syncedMins, g_syncedMaxs, SERVO_HARD_MIN_DEG, SERVO_HARD_MAX_DEG);
+  g_soft.reset(g_syncedMins, g_syncedMaxs);
   g_softSynced = true;
 }
 
@@ -68,14 +73,6 @@ void syncSoftLimits() {
   }
 
   resetSoftFromSaved();
-
-  for (int i = 0; i < SERVO_COUNT; i++) {
-    if (g_soft.mins[i] != g_syncedMins[i] || g_soft.maxs[i] != g_syncedMaxs[i]) {
-      serialLogPrint("[servo] saved range of joint ");
-      serialLogPrint(i);
-      serialLogPrintln(" exceeds the hard caps; clamped");
-    }
-  }
 }
 
 bool outputsWaking(uint32_t nowMs) {
@@ -86,6 +83,9 @@ bool outputsWaking(uint32_t nowMs) {
 
 bool readCurrent(float& outMa) {
   if (!ina219ReadCurrentMa(outMa)) {
+    if (!ina219Healthy()) {
+      g_currentValid = false;
+    }
     return false;
   }
 
@@ -94,7 +94,33 @@ bool readCurrent(float& outMa) {
   return true;
 }
 
-void onBump(uint32_t nowMs) {
+void currentAngles(float out[SERVO_COUNT]) {
+  for (int j = 0; j < SERVO_COUNT; j++) {
+    out[j] = servoAt(j).angle();
+  }
+}
+
+void observeMotion(uint32_t nowMs) {
+  float angles[SERVO_COUNT];
+  float targets[SERVO_COUNT];
+
+  for (int j = 0; j < SERVO_COUNT; j++) {
+    angles[j] = servoAt(j).angle();
+    targets[j] = servoAt(j).target();
+  }
+
+  g_motion.observe(nowMs, angles, targets);
+
+  // A /pose move re-targets every tick by fractions of a degree; count it whole.
+  if (poseMoveActive()) {
+    g_motion.noteMotion(nowMs);
+  }
+}
+
+void onEvent(BumpEvent event, uint32_t nowMs) {
+  const bool stall = event == BumpEvent::Stall;
+  const uint32_t blameMs = stall ? kStallBlameMs : BUMP_MOTION_TAIL_MS;
+
   struct Hit {
     int joint;
     float angle;
@@ -105,26 +131,37 @@ void onBump(uint32_t nowMs) {
   size_t hitCount = 0;
 
   for (int j = 0; j < SERVO_COUNT; j++) {
-    const ServoWrapper& servo = servoAt(j);
-
-    if (servo.isMoving()) {
-      hits[hitCount++] = {j, servo.angle(), travelDir(servo.angle(), servo.target())};
+    if (!g_motion.jointRecent(j, nowMs, blameMs)) {
+      continue;
     }
+
+    // Commanded angle when the over-threshold window opened (near first
+    // contact), not the one now, which has run further into the obstacle.
+    const float angle = g_detector.eventAnglesValid() ? g_detector.eventAngle(j)
+                                                      : servoAt(j).angle();
+    hits[hitCount++] = {j, angle, g_motion.jointDir(j)};
   }
 
-  if (hitCount == 0) {
-    return;
-  }
+  const float peakMa = g_detector.eventPeakMa();
 
   // Copy before the switch to none: the log names what was running.
   char animName[BUMP_ANIM_NAME_LEN + 1];
   snprintf(animName, sizeof(animName), "%s", animationName(getAnimation()));
-  const float peakMa = g_detector.bumpPeakMa();
 
   poseMoveCancel();
   setAnimationImmediately(AnimationId::None);
   // none parks every joint; a bump freezes them where they are instead.
   anim::stopAnimServos();
+
+  if (hitCount == 0) {
+    // High current, nothing moved lately: let go instead of pushing on.
+    serialLogPrint(stall ? "[bump] stall" : "[bump] bump");
+    serialLogPrint(" with no recent motion; ma=");
+    serialLogPrint(peakMa, 0);
+    serialLogPrintln("; releasing servo outputs");
+    releaseAllServoOutputs();
+    return;
+  }
 
   for (size_t i = 0; i < hitCount; i++) {
     const Hit& hit = hits[i];
@@ -133,9 +170,9 @@ void onBump(uint32_t nowMs) {
     const float backoff = g_soft.clamp(hit.joint, bumpBackoffTarget(hit.angle, hit.dir, mid));
 
     servoAt(hit.joint).setTarget(backoff, kBackoffSpeedDegS);
-    g_bumps.push(BumpLog::make(nowMs, hit.joint, hit.angle, hit.dir, peakMa, animName));
+    g_bumps.push(BumpLog::make(nowMs, hit.joint, hit.angle, hit.dir, peakMa, animName, stall));
 
-    serialLogPrint("[bump] joint=");
+    serialLogPrint(stall ? "[bump] stall joint=" : "[bump] joint=");
     serialLogPrint(hit.joint);
     serialLogPrint(" angle=");
     serialLogPrint(hit.angle, 1);
@@ -152,24 +189,48 @@ void onBump(uint32_t nowMs) {
 
 // Explore helpers -----------------------------------------------------------
 
+enum class SweepEnd {
+  Reached,       // got to the target
+  Bump,          // detector fired
+  HardStop,      // the hard cap held the joint short of the target
+  Timeout,       // EXPLORE_TIME_LIMIT_MS ran out
+  SensorFailed,  // EXPLORE_MAX_READ_FAILURES reads in a row failed
+};
+
 struct ExploreRun {
   BumpDetector detector;
-  uint16_t thresholdMa;
+  uint16_t thresholdMa = EXPLORE_THRESHOLD_CAP_MA;
   float peakMa = 0.0f;
+  uint8_t readFailures = 0;
+  bool sensorFailed = false;
+  uint32_t deadlineMs = 0;
 
   // One current sample. True when it completes a bump.
   bool sample(bool moving) {
     float ma = 0.0f;
 
     if (!readCurrent(ma)) {
+      if (++readFailures >= EXPLORE_MAX_READ_FAILURES) {
+        sensorFailed = true;
+      }
       return false;
     }
+
+    readFailures = 0;
 
     if (moving && ma > peakMa) {
       peakMa = ma;
     }
 
-    return detector.update(millis(), ma, moving, thresholdMa);
+    float angles[SERVO_COUNT];
+    currentAngles(angles);
+    const BumpSample s{static_cast<uint32_t>(millis()), ma, moving, true, thresholdMa, angles};
+    // Still samples only learn the holding current here.
+    return detector.update(s) == BumpEvent::Bump && moving;
+  }
+
+  bool timedOut() const {
+    return static_cast<int32_t>(millis() - deadlineMs) >= 0;
   }
 
   // Holds still for `ms` while the baseline learns the holding current
@@ -177,7 +238,7 @@ struct ExploreRun {
   void settle(uint32_t ms) {
     const uint32_t start = millis();
 
-    while (millis() - start < ms || outputsWaking(millis())) {
+    while ((millis() - start < ms || outputsWaking(millis())) && !sensorFailed) {
       if (outputsWaking(millis())) {
         float ma = 0.0f;
         readCurrent(ma);
@@ -189,13 +250,17 @@ struct ExploreRun {
   }
 
   // Drives `joint` to `target` at `speedDegS` (hard-clamped writes).
-  // `watch` = stop on a bump; returns true when one fired.
-  bool sweep(int joint, float target, float speedDegS, bool watch) {
+  // `watch`: stop on a bump, a sensor failure or the time limit.
+  SweepEnd sweep(int joint, float target, float speedDegS, bool watch) {
     ServoWrapper& servo = servoAt(joint);
     float pos = servo.angle();
     uint32_t last = millis();
 
     while (fabsf(target - pos) >= SERVO_ANGLE_DEADBAND_DEG) {
+      if (watch && timedOut()) {
+        return SweepEnd::Timeout;
+      }
+
       delay(kExploreStepMs);
       const uint32_t now = millis();
       const float maxStep = speedDegS * static_cast<float>(now - last) / 1000.0f;
@@ -206,18 +271,24 @@ struct ExploreRun {
       servo.driveHardClamped(commanded);
       pos = servo.angle();
 
-      if (sample(true) && watch) {
-        return true;
+      const bool bumped = sample(true);
+
+      if (watch && bumped) {
+        return SweepEnd::Bump;
+      }
+
+      if (watch && sensorFailed) {
+        return SweepEnd::SensorFailed;
       }
 
       // The hard cap held the joint short of an out-of-range target.
       if (fabsf(pos - commanded) > 0.01f) {
-        return false;
+        return SweepEnd::HardStop;
       }
     }
 
     servo.driveHardClamped(target);
-    return false;
+    return SweepEnd::Reached;
   }
 };
 
@@ -243,14 +314,26 @@ void servoSoftLimitsReset() {
 }
 
 void motionTick(uint32_t nowMs) {
+  // Motion history runs with or without the sensor (cheap, and it keeps the
+  // tail correct the moment a sensor comes back).
+  observeMotion(nowMs);
+
   if (!ina219Present() || nowMs - g_lastReadMs < kCurrentPollMs) {
     return;
   }
 
   g_lastReadMs = nowMs;
   float ma = 0.0f;
+  const bool read = readCurrent(ma);
+  const bool healthy = ina219Healthy();
 
-  if (!readCurrent(ma)) {
+  if (healthy != g_sensorWasHealthy) {
+    g_sensorWasHealthy = healthy;
+    // Baselines from before a sensor loss are not trusted afterwards.
+    g_detector.reset();
+  }
+
+  if (!read) {
     return;
   }
 
@@ -265,17 +348,31 @@ void motionTick(uint32_t nowMs) {
     return;
   }
 
-  if (g_detector.update(nowMs, ma, anyServoMoving(), settingsBumpThresholdMa())) {
-    onBump(nowMs);
+  float angles[SERVO_COUNT];
+  currentAngles(angles);
+
+  const BumpSample sample{
+    nowMs,
+    ma,
+    g_motion.active(nowMs),
+    !servoOutputsReleased(),
+    settingsBumpThresholdMa(),
+    angles,
+  };
+
+  const BumpEvent event = g_detector.update(sample);
+
+  if (event != BumpEvent::None) {
+    onEvent(event, nowMs);
   }
 }
 
 bool motionHasCurrentSensor() {
-  return ina219Present();
+  return ina219Healthy();
 }
 
 bool motionCurrentMa(float& outMa) {
-  if (!ina219Present() || !g_currentValid) {
+  if (!ina219Healthy() || !g_currentValid) {
     return false;
   }
 
@@ -350,6 +447,12 @@ ExploreResult motionExplore(int joint, BumpDir dir, float speedDegS) {
     return result;
   }
 
+  if (!ina219Healthy()) {
+    result.code = 409;
+    result.error = "current sensor not responding";
+    return result;
+  }
+
   syncSoftLimits();
 
   const float mid = servoRuntimeMid(joint);
@@ -359,6 +462,8 @@ ExploreResult motionExplore(int joint, BumpDir dir, float speedDegS) {
     SERVO_HARD_MIN_DEG[joint],
     SERVO_HARD_MAX_DEG[joint]
   );
+  const ExploreBound bound =
+    exploreSweepTarget(savedLimit, hardLimit, dir, EXPLORE_MAX_EXCURSION_DEG);
 
   serialLogPrint("[explore] joint=");
   serialLogPrint(joint);
@@ -367,7 +472,7 @@ ExploreResult motionExplore(int joint, BumpDir dir, float speedDegS) {
   serialLogPrint(" from=");
   serialLogPrint(savedLimit, 1);
   serialLogPrint(" to=");
-  serialLogPrint(hardLimit, 1);
+  serialLogPrint(bound.target, 1);
   serialLogPrint(" speed=");
   serialLogPrintln(speedDegS, 1);
 
@@ -379,26 +484,78 @@ ExploreResult motionExplore(int joint, BumpDir dir, float speedDegS) {
   activitySetExploring(true);
 
   ExploreRun run;
-  run.thresholdMa = settingsBumpThresholdMa() > 0 ? settingsBumpThresholdMa()
-                                                  : SETTINGS_DEFAULT_BUMP_THRESHOLD_MA;
-
-  run.settle(kExploreSettleMs);
-  bool bumped = run.sweep(joint, savedLimit, kExploreApproachSpeedDegS, true);
-
-  if (!bumped) {
-    run.settle(kExploreSettleMs);
-    bumped = run.sweep(joint, hardLimit, speedDegS, true);
-  }
+  run.thresholdMa = exploreThresholdMa(settingsBumpThresholdMa());
+  run.deadlineMs = millis() + EXPLORE_TIME_LIMIT_MS;
 
   ServoWrapper& servo = servoAt(joint);
+  const float startAngle = servo.angle();
+
+  run.settle(kExploreSettleMs);
+
+  if (run.sensorFailed) {
+    activitySetExploring(false);
+    result.code = 500;
+    result.error = "current sensor failed during explore";
+    return result;
+  }
+
+  // Holding current of powered servos is always positive; a missing, tiny or
+  // negative baseline means the shunt is not in the servo lead the right way round.
+  if (!run.detector.armed(true) || !exploreBaselinePlausible(run.detector.baselineMa(true))) {
+    activitySetExploring(false);
+    serialLogPrint("[explore] implausible holding current ");
+    serialLogPrintln(run.detector.baselineMa(true), 1);
+    result.code = 409;
+    result.error = "implausible servo current; check INA219 VIN+/VIN- wiring";
+    return result;
+  }
+
+  SweepEnd end = run.sweep(joint, savedLimit, kExploreApproachSpeedDegS, true);
+
+  if (end == SweepEnd::Reached) {
+    run.settle(kExploreSettleMs);
+    end = run.sensorFailed ? SweepEnd::SensorFailed
+                           : run.sweep(joint, bound.target, speedDegS, true);
+  }
+
   result.stoppedAt = servo.angle();
-  result.bumped = bumped;
   result.peakMa = run.peakMa;
+
+  // Back off from first contact when there was one, else from where it stopped.
+  const float contact = end == SweepEnd::Bump && run.detector.eventAnglesValid()
+                          ? run.detector.eventAngle(joint)
+                          : result.stoppedAt;
   result.safe = constrain(
-    bumpBackoffTarget(result.stoppedAt, dir, mid),
+    bumpBackoffTarget(contact, dir, mid),
     SERVO_HARD_MIN_DEG[joint],
     SERVO_HARD_MAX_DEG[joint]
   );
+
+  if (end == SweepEnd::SensorFailed) {
+    // Blind now: go straight back to where the joint started.
+    run.sweep(joint, g_soft.clamp(joint, startAngle), kExploreReturnSpeedDegS, false);
+    activitySetExploring(false);
+    noteActivity(millis());
+    serialLogPrintln("[explore] current reads failed; aborted");
+    result.code = 500;
+    result.error = "current sensor failed during explore";
+    return result;
+  }
+
+  switch (end) {
+    case SweepEnd::Bump:
+      result.reason = "bump";
+      break;
+    case SweepEnd::Timeout:
+      result.reason = "max_travel";
+      break;
+    case SweepEnd::Reached:
+      result.reason = bound.excursionCapped ? "max_travel" : "hard_limit";
+      break;
+    default:
+      result.reason = "hard_limit";
+      break;
+  }
 
   run.sweep(joint, result.safe, kExploreReturnSpeedDegS, false);
   // Leave the joint where animations may command it, so the next move does not jump.
@@ -410,7 +567,8 @@ ExploreResult motionExplore(int joint, BumpDir dir, float speedDegS) {
 
   serialLogPrint("[explore] stopped_at=");
   serialLogPrint(result.stoppedAt, 1);
-  serialLogPrint(bumped ? " reason=bump" : " reason=hard_limit");
+  serialLogPrint(" reason=");
+  serialLogPrint(result.reason);
   serialLogPrint(" safe=");
   serialLogPrint(result.safe, 1);
   serialLogPrint(" peak_ma=");

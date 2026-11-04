@@ -89,6 +89,7 @@ JsonDocument rangesJson() {
     item["dir"] = bumpDirName(entry.dir);
     item["current_ma"] = round1(entry.currentMa);
     item["anim"] = entry.anim;
+    item["kind"] = entry.stall ? "stall" : "bump";
   }
 
   return doc;
@@ -284,11 +285,6 @@ void handleRangesExplore(WebServer& server) {
     }
   }
 
-  if (!motionHasCurrentSensor()) {
-    sendError(server, 409, "no current sensor");
-    return;
-  }
-
   if (apiBusyHeld()) {
     sendError(server, 503, "busy");
     return;
@@ -306,7 +302,7 @@ void handleRangesExplore(WebServer& server) {
   reply["joint"] = result.joint;
   reply["dir"] = bumpDirName(result.dir);
   reply["stopped_at"] = round1(result.stoppedAt);
-  reply["reason"] = result.bumped ? "bump" : "hard_limit";
+  reply["reason"] = result.reason;
   reply["safe"] = round1(result.safe);
   reply["peak_ma"] = round1(result.peakMa);
   sendJson(server, 200, reply);

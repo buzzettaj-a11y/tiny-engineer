@@ -41,6 +41,35 @@ void test_word_is_big_endian() {
   TEST_ASSERT_EQUAL_INT16(-1, static_cast<int16_t>(ina219Word(0xFF, 0xFF)));
 }
 
+void test_health_lost_after_consecutive_failures_and_recovers() {
+  Ina219Health h;
+  TEST_ASSERT_TRUE(h.healthy());
+  uint32_t t = 0;
+
+  for (uint8_t i = 0; i + 1 < INA219_FAILS_BEFORE_UNHEALTHY; i++) {
+    h.onRead(false, t += 10);
+    TEST_ASSERT_TRUE(h.healthy());
+  }
+  // A good read in between resets the count.
+  h.onRead(true, t += 10);
+  for (uint8_t i = 0; i + 1 < INA219_FAILS_BEFORE_UNHEALTHY; i++) {
+    h.onRead(false, t += 10);
+  }
+  TEST_ASSERT_TRUE(h.healthy());
+  h.onRead(false, t += 10);
+  TEST_ASSERT_FALSE(h.healthy());
+
+  // While lost: retried once a second, not every poll.
+  TEST_ASSERT_FALSE(h.shouldTry(t + 10));
+  TEST_ASSERT_FALSE(h.shouldTry(t + INA219_RETRY_MS - 1));
+  TEST_ASSERT_TRUE(h.shouldTry(t + INA219_RETRY_MS));
+
+  // One good read recovers.
+  h.onRead(true, t + INA219_RETRY_MS);
+  TEST_ASSERT_TRUE(h.healthy());
+  TEST_ASSERT_TRUE(h.shouldTry(t + INA219_RETRY_MS + 5));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_address_does_not_clash);
@@ -48,5 +77,6 @@ int main() {
   RUN_TEST(test_calibration_for_0p1_ohm_and_0p1_ma_lsb);
   RUN_TEST(test_shunt_raw_to_ma);
   RUN_TEST(test_word_is_big_endian);
+  RUN_TEST(test_health_lost_after_consecutive_failures_and_recovers);
   return UNITY_END();
 }

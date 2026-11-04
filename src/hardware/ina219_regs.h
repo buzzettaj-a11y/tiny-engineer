@@ -39,3 +39,22 @@ float ina219ShuntRawToMa(int16_t raw);
 inline uint16_t ina219Word(uint8_t msb, uint8_t lsb) {
   return static_cast<uint16_t>((static_cast<uint16_t>(msb) << 8) | lsb);
 }
+
+// Read health after boot: INA219_FAILS_BEFORE_UNHEALTHY consecutive failed
+// reads = sensor lost (current null, reflex off, explore refused). While lost,
+// reads are retried every INA219_RETRY_MS; one good read recovers.
+constexpr uint8_t INA219_FAILS_BEFORE_UNHEALTHY = 5;
+constexpr uint32_t INA219_RETRY_MS = 1000;
+
+class Ina219Health {
+public:
+  void onRead(bool ok, uint32_t nowMs);
+  bool healthy() const { return healthy_; }
+  // Healthy: every poll. Lost: once per INA219_RETRY_MS.
+  bool shouldTry(uint32_t nowMs) const;
+
+private:
+  uint8_t failures_ = 0;
+  bool healthy_ = true;
+  uint32_t lastTryMs_ = 0;
+};

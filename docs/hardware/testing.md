@@ -117,7 +117,7 @@ curl -X POST "http://tiny-engineer.local/test/servo" -H "Content-Type: applicati
 | `GET` / `POST` | `/mic` | Mic state (`muted`, `streaming`, `present`, `level`) / mute with `{"muted":true}` — [api.md](../api.md#get-mic) |
 | `POST` | `/pose` `{"pose":[5 × -1..1 or null],"ms"}` | Eased free-form move in `none`, clamped to the soft limits — [api.md](../api.md#post-pose) |
 | `GET` / `POST` | `/ranges` | Saved / soft / hard servo limits, current and bump log / save calibration outside setup `{"servo_mins","servo_maxs"}` — [api.md](../api.md#get-ranges) |
-| `POST` | `/ranges/explore` `{"joint","dir","speed"}` | Blocking probe of one joint toward its hard cap until a bump; needs the INA219 (`409` without) — [api.md](../api.md#post-rangesexplore) |
+| `POST` | `/ranges/explore` `{"joint","dir","speed"}` | Blocking probe (≤ ~14 s) of one joint toward its hard cap, at most 30° past the saved limit, until a bump; needs a working INA219 (`409` without) — [api.md](../api.md#post-rangesexplore) |
 | `POST` | `/bumps/clear` | Empty the bump log, soft limits back to saved |
 | `GET` | `/settings` | Persistent settings (`sleep_timeout`, `hostname`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `loading`, `eyes_style`, `access_token_set`, `wifi_configured`, `servo_mins`, `servo_maxs`, `rgb_order`, `oled_rotate_180`, `brain_host`, `brain_port`, `bump_threshold_ma`, `mic_shift`, `wifi_networks`) |
 | `POST` | `/settings` | Update NVS settings from a JSON object; the reply carries `reboot_required`, true once `hostname`, `loading` or the WiFi networks differ from what the robot booted with. `servo_mins` / `servo_maxs` (integer arrays), `rgb_order` and `oled_rotate_180` (boolean) are setup-AP-only |
@@ -156,6 +156,8 @@ HTTP runs on STA when connected, or on setup AP at `192.168.4.1` during provisio
 | `/mic` `present` stays `false` with a mic fitted | No INMP441 data on GP6 | INMP441 **VDD=3V3** (never 5 V), GND, **L/R to GND** (left slot), SCK→GP2, WS→GP3, SD→GP6; `GET /mic` `level` moves when you talk |
 | `/mic` `streaming` stays `false` | Not muted, but nothing sent | `brain_host` set (`GET /settings`), Wi-Fi STA connected, host resolvable from the robot (try an IPv4 literal) |
 | `/ranges` `sensor` is `false` | No ACK at `0x41` | INA219 A0 jumper bridged (0x41; PCA9685 owns 0x40), VCC=3V3, SDA/SCL on GP0/GP1 |
+| `[ina219] reads failing; bump reflex off` | INA219 stopped answering after boot | Wiring / brownout on the 3V3 or I2C lines; `sensor` is `false` in `GET /ranges` until reads work again (retried once a second) |
+| `/ranges/explore` → `implausible servo current` | Holding current < 10 mA, negative, or > 1500 mA | INA219 **VIN+ / VIN−** swapped, or not in series with the 5 V lead to PCA9685 **V+** |
 | Bumps on every move / never | Threshold vs this robot's servo current | Watch `current_ma` in `GET /ranges` while an animation runs; tune `bump_threshold_ma` |
 
 OLED absence and Wi-Fi failure are **soft** fails. PCA9685 and I2S failures **halt** in `while (true)`.

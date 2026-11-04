@@ -25,43 +25,53 @@ namespace {
 constexpr const char* kMicNs = "te";
 constexpr const char* kMicMuteKey = "mic_mute";
 
-// ESP-IDF FreeRTOS stack sizes are in bytes. getaddrinfo() and lwIP sendto()
-// run on this stack; all audio buffers are static.
-constexpr uint32_t kTaskStackBytes = 6144;
-// Above loop() (1), below lwIP (18) and Wi-Fi (23). It sleeps in the I2S read.
-constexpr UBaseType_t kTaskPriority = 2;
+// Three tasks, so that nothing can delay a mute press or the I2S reads:
+//   mic     — I2S RX, level/presence, UDP send. Never blocks on anything else.
+//   micbtn  — polls GP7 every 5 ms and counts presses. Nothing else.
+//   micdns  — resolves brain_host (blocking DNS) into an IPv4 + port.
+// ESP-IDF FreeRTOS stack sizes are in bytes; all audio buffers are static.
+constexpr uint32_t kMicStackBytes = 4096;
+constexpr uint32_t kButtonStackBytes = 2048;
+constexpr uint32_t kDnsStackBytes = 4096;
+// Above loop() (1), below lwIP (18) and Wi-Fi (23). They all sleep most of the time.
+constexpr UBaseType_t kMicPriority = 2;
+constexpr UBaseType_t kButtonPriority = 3;
+constexpr UBaseType_t kDnsPriority = 1;
 constexpr uint32_t kReadTimeoutMs = 100;
+constexpr uint32_t kButtonPollMs = 5;
+constexpr uint32_t kDnsPollMs = 100;
 constexpr uint32_t kResolveRetryMs = 5000;
 constexpr uint32_t kResolveRefreshMs = 60000;
 
 constexpr size_t kFrames = kMicSamplesPerPacket;
 
-struct MicConfig {
-  char host[SETTINGS_BRAIN_HOST_MAX_LEN + 1];
-  uint16_t port;
-  uint8_t shift;
-  uint32_t generation;
-};
-
-// Task-owned buffers (static: off the task stack).
+// Task-owned buffers (static: off the task stacks).
 int32_t g_rx[kFrames * 2];
 int16_t g_samples[kFrames];
 uint8_t g_packet[kMicPacketMaxLen];
 WiFiUDP g_udp;
 
-TaskHandle_t g_task = nullptr;
-SemaphoreHandle_t g_configLock = nullptr;
-MicConfig g_config = {};  // guarded by g_configLock
+TaskHandle_t g_micTask = nullptr;
+TaskHandle_t g_buttonTask = nullptr;
+
+// brain_host / brain_port for the DNS task; written by the loop task under the lock.
+SemaphoreHandle_t g_hostLock = nullptr;
+char g_host[SETTINGS_BRAIN_HOST_MAX_LEN + 1] = {};
+uint16_t g_hostPort = 0;
+uint32_t g_hostGeneration = 0;
 
 // Cross-task state: plain atomic loads/stores only. The ESP32-C3 (RV32IMC) has
-// no atomic read-modify-write instructions, so every counter has one writer.
-std::atomic<bool> g_muted{false};
-std::atomic<uint32_t> g_buttonPresses{0};  // written by the button reader only
-std::atomic<bool> g_present{false};
-std::atomic<bool> g_streaming{false};
-std::atomic<uint16_t> g_levelPermille{0};
-std::atomic<uint32_t> g_sendFailures{0};     // mic task only
-std::atomic<uint32_t> g_resolveFailures{0};  // mic task only
+// no atomic read-modify-write instructions, so every value has one writer.
+std::atomic<uint32_t> g_buttonPresses{0};  // button reader only
+std::atomic<uint32_t> g_muteState{0};      // loop task only (micPackMuteState)
+std::atomic<uint8_t> g_shift{SETTINGS_DEFAULT_MIC_SHIFT};  // loop task only
+std::atomic<uint16_t> g_destPort{0};       // DNS task only
+std::atomic<uint32_t> g_destIp{0};         // DNS task only; 0 = nowhere to send
+std::atomic<bool> g_present{false};        // mic task only
+std::atomic<bool> g_streaming{false};      // mic task only
+std::atomic<uint16_t> g_levelPermille{0};  // mic task only
+std::atomic<uint32_t> g_sendFailures{0};   // mic task only
+std::atomic<uint32_t> g_resolveFailures{0};  // DNS task only
 
 // Loop-task state.
 bool g_indicatorMuted = false;
@@ -69,8 +79,21 @@ bool g_loggedPresent = false;
 bool g_loggedStreaming = false;
 uint32_t g_loggedSendFailures = 0;
 uint32_t g_loggedResolveFailures = 0;
-uint32_t g_handledButtonPresses = 0;
+char g_syncedHost[SETTINGS_BRAIN_HOST_MAX_LEN + 1] = {};
+uint16_t g_syncedPort = 0;
+bool g_hostSynced = false;
 MicButton g_loopButton;
+
+void bump(std::atomic<uint32_t>& counter) {
+  counter.store(counter.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
+}
+
+bool effectiveMuted() {
+  return micEffectiveMuted(
+    g_muteState.load(std::memory_order_acquire),
+    g_buttonPresses.load(std::memory_order_acquire)
+  );
+}
 
 void saveMuted(bool muted) {
   Preferences prefs;
@@ -101,115 +124,125 @@ bool buttonRawPressed() {
   return digitalRead(MIC_MUTE_BUTTON_PIN) == LOW;
 }
 
-// Called by whichever task reads the button (never both).
-void onButtonPress() {
-  g_muted.store(!g_muted.load(std::memory_order_relaxed), std::memory_order_relaxed);
-  g_buttonPresses.store(g_buttonPresses.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
-}
-
-void countFailure(std::atomic<uint32_t>& counter) {
-  counter.store(counter.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
-}
-
-// Pushes brain_host / brain_port / mic_shift to the task when they change.
+// Loop task: pushes settings to the tasks when they change.
 void syncConfig() {
-  if (g_configLock == nullptr) {
-    return;
-  }
+  g_shift.store(settingsMicShift(), std::memory_order_relaxed);
 
   const char* host = settingsBrainHost();
   const uint16_t port = settingsBrainPort();
-  const uint8_t shift = settingsMicShift();
 
-  if (xSemaphoreTake(g_configLock, 0) != pdTRUE) {
+  if (g_hostSynced && strcmp(g_syncedHost, host) == 0 && g_syncedPort == port) {
     return;
   }
 
-  if (strcmp(g_config.host, host) != 0 || g_config.port != port || g_config.shift != shift) {
-    strlcpy(g_config.host, host, sizeof(g_config.host));
-    g_config.port = port;
-    g_config.shift = shift;
-    g_config.generation++;
+  if (g_hostLock == nullptr || xSemaphoreTake(g_hostLock, 0) != pdTRUE) {
+    return;
   }
 
-  xSemaphoreGive(g_configLock);
+  strlcpy(g_host, host, sizeof(g_host));
+  g_hostPort = port;
+  g_hostGeneration++;
+  xSemaphoreGive(g_hostLock);
+
+  strlcpy(g_syncedHost, host, sizeof(g_syncedHost));
+  g_syncedPort = port;
+  g_hostSynced = true;
 }
 
-class Destination {
-public:
-  void configure(const MicConfig& config) {
-    config_ = config;
-    resolved_ = false;
-    tried_ = false;
-    literal_ = ip_.fromString(config_.host);
-    resolved_ = literal_;
-  }
+void publishDestination(uint32_t ip, uint16_t port) {
+  // ip goes to 0 first so the mic task never pairs a new port with an old ip
+  // for long (at most one packet).
+  g_destIp.store(0, std::memory_order_release);
+  g_destPort.store(port, std::memory_order_release);
+  g_destIp.store(ip, std::memory_order_release);
+}
 
-  bool enabled() const {
-    return config_.host[0] != '\0';
-  }
+void buttonTask(void* /*arg*/) {
+  MicButton button;
 
-  // Resolves hostnames on this task (may block for a DNS round trip).
-  bool ready(uint32_t nowMs) {
-    if (!enabled()) {
-      return false;
+  for (;;) {
+    if (button.update(buttonRawPressed(), millis())) {
+      // Counted only; the loop task applies it. The mic task honours a pending
+      // press at once (micEffectiveMuted), so no audio leaves after a press.
+      g_buttonPresses.store(
+        g_buttonPresses.load(std::memory_order_relaxed) + 1,
+        std::memory_order_release
+      );
     }
 
-    if (literal_) {
-      return true;
-    }
+    vTaskDelay(pdMS_TO_TICKS(kButtonPollMs));
+  }
+}
 
-    const uint32_t since = nowMs - lastResolveMs_;
-    const bool due = !tried_ ||
-                     (!resolved_ && since >= kResolveRetryMs) ||
-                     (resolved_ && since >= kResolveRefreshMs);
+void dnsTask(void* /*arg*/) {
+  char host[SETTINGS_BRAIN_HOST_MAX_LEN + 1] = {};
+  uint32_t generation = UINT32_MAX;
+  uint16_t port = 0;
+  bool literal = false;
+  bool resolved = false;
+  bool tried = false;
+  uint32_t lastResolveMs = 0;
 
-    if (due) {
-      tried_ = true;
-      lastResolveMs_ = nowMs;
-      IPAddress fresh;
+  for (;;) {
+    vTaskDelay(pdMS_TO_TICKS(kDnsPollMs));
 
-      if (WiFi.hostByName(config_.host, fresh) == 1) {
-        ip_ = fresh;
-        resolved_ = true;
-      } else {
-        countFailure(g_resolveFailures);
+    if (xSemaphoreTake(g_hostLock, pdMS_TO_TICKS(10)) == pdTRUE) {
+      if (g_hostGeneration != generation) {
+        generation = g_hostGeneration;
+        strlcpy(host, g_host, sizeof(host));
+        port = g_hostPort;
+        tried = false;
+        resolved = false;
+        IPAddress ip;
+        literal = host[0] != '\0' && ip.fromString(host);
+        publishDestination(literal ? static_cast<uint32_t>(ip) : 0, port);
+        resolved = literal;
       }
+      xSemaphoreGive(g_hostLock);
     }
 
-    return resolved_;
-  }
-
-  bool send(const uint8_t* data, size_t length) {
-    if (g_udp.beginPacket(ip_, config_.port) != 1) {
-      return false;
+    if (host[0] == '\0' || literal || !activityWifiUp()) {
+      continue;
     }
 
-    g_udp.write(data, length);
-    return g_udp.endPacket() == 1;
+    const uint32_t now = millis();
+    const uint32_t since = now - lastResolveMs;
+    const bool due = !tried ||
+                     (!resolved && since >= kResolveRetryMs) ||
+                     (resolved && since >= kResolveRefreshMs);
+
+    if (!due) {
+      continue;
+    }
+
+    tried = true;
+    lastResolveMs = now;
+    IPAddress fresh;
+
+    // IPv4 only: operator uint32_t() is 0 for an IPv6 answer.
+    if (WiFi.hostByName(host, fresh) == 1 && static_cast<uint32_t>(fresh) != 0) {
+      resolved = true;
+      publishDestination(static_cast<uint32_t>(fresh), port);
+    } else {
+      bump(g_resolveFailures);
+    }
+  }
+}
+
+bool sendPacket(uint32_t ip, uint16_t port, const uint8_t* data, size_t length) {
+  if (g_udp.beginPacket(IPAddress(ip), port) != 1) {
+    return false;
   }
 
-  uint8_t shift() const {
-    return config_.shift == 0 ? SETTINGS_DEFAULT_MIC_SHIFT : config_.shift;
-  }
-
-private:
-  MicConfig config_ = {};
-  IPAddress ip_;
-  bool literal_ = false;
-  bool resolved_ = false;
-  bool tried_ = false;
-  uint32_t lastResolveMs_ = 0;
-};
+  g_udp.write(data, length);
+  return g_udp.endPacket() == 1;
+}
 
 void micTask(void* /*arg*/) {
   const i2s_chan_handle_t rx = I2S.rxChan();
-  Destination destination;
-  uint32_t generation = UINT32_MAX;
   uint32_t seq = 0;
   bool heartbeatSent = false;
   uint32_t lastHeartbeatMs = 0;
-  MicButton button;
   MicPresence presence;
   MicLevel level;
 
@@ -223,19 +256,6 @@ void micTask(void* /*arg*/) {
       vTaskDelay(pdMS_TO_TICKS(50));
     }
 
-    if (button.update(buttonRawPressed(), now)) {
-      onButtonPress();
-    }
-
-    if (xSemaphoreTake(g_configLock, 0) == pdTRUE) {
-      if (g_config.generation != generation) {
-        generation = g_config.generation;
-        destination.configure(g_config);
-      }
-      xSemaphoreGive(g_configLock);
-    }
-
-    const bool muted = g_muted.load(std::memory_order_relaxed);
     const size_t frames = bytes / (2 * sizeof(int32_t));
 
     if (frames > 0) {
@@ -244,16 +264,21 @@ void micTask(void* /*arg*/) {
         g_present.store(true, std::memory_order_relaxed);
       }
 
-      micConvertLeftSlots(g_rx, frames, destination.shift(), g_samples);
-      level.update(muted ? 0 : micBlockLevelPermille(g_samples, frames));
+      micConvertLeftSlots(g_rx, frames, g_shift.load(std::memory_order_relaxed), g_samples);
+      level.update(effectiveMuted() ? 0 : micBlockLevelPermille(g_samples, frames));
       g_levelPermille.store(level.permille(), std::memory_order_relaxed);
     }
 
-    if (!activityWifiUp() || !destination.ready(now)) {
+    const uint32_t ip = g_destIp.load(std::memory_order_acquire);
+    const uint16_t port = g_destPort.load(std::memory_order_acquire);
+
+    if (!activityWifiUp() || ip == 0 || port == 0) {
       g_streaming.store(false, std::memory_order_relaxed);
       continue;
     }
 
+    // Read last, right before sending: a press counted a moment ago wins.
+    const bool muted = effectiveMuted();
     const uint16_t flags = micFlagBits(
       muted,
       activitySpeaker(now),
@@ -268,8 +293,8 @@ void micTask(void* /*arg*/) {
         heartbeatSent = true;
         lastHeartbeatMs = now;
         micWriteHeader(g_packet, seq++, now, flags, 0);
-        if (!destination.send(g_packet, kMicHeaderLen)) {
-          countFailure(g_sendFailures);
+        if (!sendPacket(ip, port, g_packet, kMicHeaderLen)) {
+          bump(g_sendFailures);
         }
       }
       continue;
@@ -290,17 +315,33 @@ void micTask(void* /*arg*/) {
     );
     micWriteSamplesLe(g_packet + kMicHeaderLen, g_samples, frames);
 
-    const bool sent = destination.send(g_packet, kMicHeaderLen + frames * sizeof(int16_t));
+    const bool sent = sendPacket(ip, port, g_packet, kMicHeaderLen + frames * sizeof(int16_t));
     g_streaming.store(sent, std::memory_order_relaxed);
 
     if (!sent) {
-      countFailure(g_sendFailures);
+      bump(g_sendFailures);
     }
   }
 }
 
+// Loop task: folds counted presses into the saved state.
+void applyButtonPresses() {
+  const uint32_t presses = g_buttonPresses.load(std::memory_order_acquire);
+  const uint32_t state = g_muteState.load(std::memory_order_relaxed);
+
+  if ((presses & 0x7FFFFFFFu) == micStateApplied(state)) {
+    return;
+  }
+
+  const bool muted = micEffectiveMuted(state, presses);
+  g_muteState.store(micPackMuteState(presses, muted), std::memory_order_release);
+  saveMuted(muted);
+  serialLogPrint("[mic] button: muted=");
+  serialLogPrintln(muted ? "yes" : "no");
+}
+
 void refreshIndicator(uint32_t nowMs) {
-  const bool muted = g_muted.load(std::memory_order_relaxed);
+  const bool muted = effectiveMuted();
 
   if (muted == g_indicatorMuted) {
     return;
@@ -350,58 +391,63 @@ void initMic() {
   pinMode(MIC_MUTE_BUTTON_PIN, INPUT_PULLUP);
 
   const bool muted = loadMuted();
-  g_muted.store(muted, std::memory_order_relaxed);
-  // Set apart from g_muted so the first micTick() paints a muted indicator.
+  g_muteState.store(micPackMuteState(0, muted), std::memory_order_release);
+  // Set apart from the state so the first micTick() paints a muted indicator.
   g_indicatorMuted = false;
 
-  g_configLock = xSemaphoreCreateMutex();
+  g_hostLock = xSemaphoreCreateMutex();
   syncConfig();
 
   serialLogPrint("[mic] muted=");
   serialLogPrintln(muted ? "yes" : "no");
 
-  if (g_configLock == nullptr || I2S.rxChan() == nullptr) {
+  // The button works with or without a mic.
+  if (xTaskCreate(buttonTask, "micbtn", kButtonStackBytes, nullptr, kButtonPriority, &g_buttonTask) !=
+      pdPASS) {
+    g_buttonTask = nullptr;
+    serialLogPrintln("[mic] button task start failed; button read in loop()");
+  }
+
+  if (g_hostLock == nullptr || I2S.rxChan() == nullptr) {
     serialLogPrintln("[mic] no I2S RX channel; mic stream off");
     return;
   }
 
-  if (xTaskCreate(micTask, "mic", kTaskStackBytes, nullptr, kTaskPriority, &g_task) != pdPASS) {
-    g_task = nullptr;
+  if (xTaskCreate(dnsTask, "micdns", kDnsStackBytes, nullptr, kDnsPriority, nullptr) != pdPASS) {
+    serialLogPrintln("[mic] DNS task start failed; mic stream off");
+    return;
+  }
+
+  if (xTaskCreate(micTask, "mic", kMicStackBytes, nullptr, kMicPriority, &g_micTask) != pdPASS) {
+    g_micTask = nullptr;
     serialLogPrintln("[mic] task start failed; mic stream off");
     return;
   }
 
-  serialLogPrintln("[mic] task started");
+  serialLogPrintln("[mic] tasks started");
 }
 
 void micTick(uint32_t nowMs) {
   syncConfig();
 
-  // Without the task the button is still read here (loop rate).
-  if (g_task == nullptr && g_loopButton.update(buttonRawPressed(), nowMs)) {
-    onButtonPress();
+  // Without the button task the button is read here (loop rate).
+  if (g_buttonTask == nullptr && g_loopButton.update(buttonRawPressed(), nowMs)) {
+    bump(g_buttonPresses);
   }
 
-  const uint32_t presses = g_buttonPresses.load(std::memory_order_relaxed);
-
-  if (presses != g_handledButtonPresses) {
-    g_handledButtonPresses = presses;
-    const bool muted = g_muted.load(std::memory_order_relaxed);
-    saveMuted(muted);
-    serialLogPrint("[mic] button: muted=");
-    serialLogPrintln(muted ? "yes" : "no");
-  }
-
+  applyButtonPresses();
   refreshIndicator(nowMs);
   logChanges();
 }
 
 bool micMuted() {
-  return g_muted.load(std::memory_order_relaxed);
+  return effectiveMuted();
 }
 
 void micSetMuted(bool muted) {
-  g_muted.store(muted, std::memory_order_relaxed);
+  // An explicit set also settles any presses counted so far.
+  const uint32_t presses = g_buttonPresses.load(std::memory_order_acquire);
+  g_muteState.store(micPackMuteState(presses, muted), std::memory_order_release);
   saveMuted(muted);
   serialLogPrint("[mic] muted=");
   serialLogPrintln(muted ? "yes" : "no");
@@ -410,7 +456,7 @@ void micSetMuted(bool muted) {
 
 MicStatus micStatus() {
   MicStatus status{};
-  status.muted = g_muted.load(std::memory_order_relaxed);
+  status.muted = effectiveMuted();
   status.streaming = !status.muted && g_streaming.load(std::memory_order_relaxed);
   status.present = g_present.load(std::memory_order_relaxed);
   status.level = status.muted ? 0.0f : g_levelPermille.load(std::memory_order_relaxed) / 1000.0f;

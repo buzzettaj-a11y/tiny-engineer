@@ -23,7 +23,7 @@ PCA9685 **VCC** = **3V3**. OLED **VCC** = **3V3**. INA219 **VCC** = **3V3**. Pul
 
 ### INA219 current sensor (optional)
 
-Measures the servo rail: **VIN+ → VIN−** in series with the 5 V lead to the PCA9685 **V+** screw terminal. Firmware assumes the stock **0.1 Ω** shunt and configures PGA /8 (±320 mV = ±3.2 A), 12-bit shunt conversions averaged ×8 (4.26 ms), shunt-only continuous mode. It reads the shunt-voltage register (10 µV/LSB = 0.1 mA) every loop tick (at most every 5 ms), checks the config once a second and rewrites it after a brownout reset. Raw register access in [`src/hardware/ina219.cpp`](../../src/hardware/ina219.cpp); no library.
+Measures the servo rail: **VIN+ → VIN−** in series with the 5 V lead to the PCA9685 **V+** screw terminal. Firmware assumes the stock **0.1 Ω** shunt and configures PGA /8 (±320 mV = ±3.2 A), 12-bit shunt conversions averaged ×8 (4.26 ms), shunt-only continuous mode. It reads the shunt-voltage register (10 µV/LSB = 0.1 mA) every loop tick (at most every 5 ms), checks the config once a second and rewrites it after a brownout reset. Five failed reads in a row mark the sensor lost (current `null`, bump reflex off, explore refused); it is retried once a second and comes back on the first good read. Raw register access in [`src/hardware/ina219.cpp`](../../src/hardware/ina219.cpp); no library.
 
 ## I2S
 
@@ -99,5 +99,5 @@ C3-Zero has **no** USB–UART bridge. If CDC does not enumerate, hold **BOOT (GP
 
 ## Mic mute button (optional)
 
-Momentary switch from **GP7** to **GND**. `INPUT_PULLUP`, active LOW, 30 ms debounce, each press toggles mute (saved in NVS). Nothing on GP7 = never muted by the button.
+Momentary switch from **GP7** to **GND**. `INPUT_PULLUP`, active LOW, read every 5 ms by its own task with a 30 ms debounce; each press toggles mute (saved in NVS) and the mic stream honours it on the next packet. Nothing on GP7 = never muted by the button.
 | ESP32 onboard USB-C | — | Unused when the board USB-C supplies power + data |
