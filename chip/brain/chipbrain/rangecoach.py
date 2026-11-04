@@ -202,6 +202,8 @@ def explore_stop_message(e: "RobotError") -> str | None:
             return ("My current sensor reading looks wrong, so I stopped. "
                     "Check that its VIN plus and VIN minus wires aren't swapped.")
         return "I couldn't check my limits: " + err + "."
+    if e.status == 500 and "steady" in err:
+        return "I couldn't get a steady reading from my current sensor, so I stopped."
     if e.status == 500 and "sensor" in err:
         return "My current sensor stopped answering halfway, so I stopped."
     return None

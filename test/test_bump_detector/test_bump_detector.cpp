@@ -327,6 +327,111 @@ void test_log_entry_name_truncates() {
   TEST_ASSERT_EQUAL_STRING("", n.anim);
 }
 
+void test_reviewer_trace_stall_after_bump_is_not_blamed_on_backoff() {
+  // Joint 0 drives toward max, bumps at 150; the reflex claims its back-off
+  // to 146 (a Min slew). It keeps pressing; ~800 ms later a stall fires.
+  // The back-off must not be blamed (dir Min would narrow the min to mid and
+  // drive the joint back into the obstacle): blame is uncertain -> release.
+  MotionTracker m;
+  float angles[SERVO_COUNT] = {120, 90, 90, 90, 90};
+  float targets[SERVO_COUNT] = {160, 90, 90, 90, 90};
+  uint32_t t = 0;
+
+  for (; angles[0] < 150.0f; t += 10) {
+    angles[0] += 1.0f;
+    m.observe(t, angles, targets);
+  }
+  TEST_ASSERT_TRUE(m.jointDir(0) == BumpDir::Max);
+  const uint32_t bumpAt = t;
+
+  // Reflex: stop everything, back joint 0 off to 146, claim those targets.
+  for (int j = 0; j < SERVO_COUNT; j++) {
+    targets[j] = angles[j];
+  }
+  targets[0] = 146.0f;
+  m.claim(targets);
+
+  for (; t < bumpAt + 200; t += 10) {
+    if (angles[0] > 146.0f) {
+      angles[0] -= 0.25f;
+    }
+    m.observe(t, angles, targets);
+    TEST_ASSERT_TRUE(m.active(t));  // the back-off is still "moving"
+  }
+  for (; t < bumpAt + 800; t += 10) {
+    m.observe(t, angles, targets);
+  }
+
+  TEST_ASSERT_TRUE(m.jointDir(0) == BumpDir::Max);  // never flipped by the back-off
+  TEST_ASSERT_FALSE(m.jointRecent(0, t, BUMP_STALL_BLAME_MS));
+  TEST_ASSERT_EQUAL_INT(-1, stallBlameJoint(m, t));
+}
+
+void test_stall_blames_the_one_joint_that_just_stopped() {
+  MotionTracker m;
+  float angles[SERVO_COUNT] = {90, 90, 60, 90, 90};
+  float targets[SERVO_COUNT] = {90, 90, 40, 90, 90};
+  uint32_t t = 0;
+
+  for (; angles[2] > 40.0f; t += 10) {
+    angles[2] -= 1.0f;
+    m.observe(t, angles, targets);
+  }
+  const uint32_t ended = t - 10;
+  for (; t < ended + BUMP_MOTION_TAIL_MS + BUMP_STALL_MS; t += 10) {
+    m.observe(t, angles, targets);
+  }
+
+  TEST_ASSERT_EQUAL_INT(2, stallBlameJoint(m, t));
+  // Long after: no longer blamable.
+  TEST_ASSERT_EQUAL_INT(-1, stallBlameJoint(m, ended + BUMP_STALL_BLAME_MS + 10));
+
+  // Direction from the side of mid, not the last slew.
+  BumpDir dir = BumpDir::Max;
+  TEST_ASSERT_TRUE(stallDir(40.0f, 90.0f, dir));
+  TEST_ASSERT_TRUE(dir == BumpDir::Min);
+  TEST_ASSERT_TRUE(stallDir(140.0f, 90.0f, dir));
+  TEST_ASSERT_TRUE(dir == BumpDir::Max);
+  TEST_ASSERT_FALSE(stallDir(90.1f, 90.0f, dir));
+}
+
+void test_stall_blame_uncertain_with_two_joints() {
+  MotionTracker m;
+  float angles[SERVO_COUNT] = {90, 90, 90, 90, 90};
+  float targets[SERVO_COUNT] = {90, 90, 90, 90, 90};
+  m.observe(0, angles, targets);
+  targets[1] = 100;
+  targets[4] = 80;
+  m.observe(10, angles, targets);
+  TEST_ASSERT_EQUAL_INT(-1, stallBlameJoint(m, 500));
+}
+
+void test_claim_ends_on_a_new_target() {
+  MotionTracker m;
+  float angles[SERVO_COUNT] = {90, 90, 90, 90, 90};
+  float targets[SERVO_COUNT] = {90, 90, 90, 90, 90};
+  m.observe(0, angles, targets);
+  m.claim(targets);
+  m.observe(10, angles, targets);
+  TEST_ASSERT_FALSE(m.active(10));
+  // An animation commands joint 3: real motion again, blamable.
+  targets[3] = 70;
+  m.observe(20, angles, targets);
+  TEST_ASSERT_TRUE(m.jointRecent(3, 20, BUMP_MOTION_TAIL_MS));
+  TEST_ASSERT_TRUE(m.jointDir(3) == BumpDir::Min);
+}
+
+void test_clear_cooldown_unblinds_next_sweep() {
+  BumpDetector d;
+  uint32_t t = 0;
+  arm(d, t, 100.0f);
+  Feed f{d, t};
+  TEST_ASSERT_TRUE(f.run(1000, 10, 900.0f, false) == BumpEvent::Stall);
+  d.clearCooldown();
+  // Within what would have been the 500 ms cooldown, a moving bump still fires.
+  TEST_ASSERT_TRUE(f.run(100, 10, 900.0f, true) == BumpEvent::Bump);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_not_armed_until_still_samples_with_outputs_on);
@@ -348,6 +453,11 @@ int main() {
   RUN_TEST(test_tracker_tail);
   RUN_TEST(test_tracker_note_motion);
   RUN_TEST(test_tail_keeps_bump_window_open_after_move_ends);
+  RUN_TEST(test_reviewer_trace_stall_after_bump_is_not_blamed_on_backoff);
+  RUN_TEST(test_stall_blames_the_one_joint_that_just_stopped);
+  RUN_TEST(test_stall_blame_uncertain_with_two_joints);
+  RUN_TEST(test_claim_ends_on_a_new_target);
+  RUN_TEST(test_clear_cooldown_unblinds_next_sweep);
   RUN_TEST(test_log_newest_first_and_wraps);
   RUN_TEST(test_log_entry_name_truncates);
   return UNITY_END();

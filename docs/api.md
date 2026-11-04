@@ -751,7 +751,7 @@ Reply: same JSON as `GET /ranges`. Soft limits reset to the new saved values; th
 
 ### `POST /ranges/explore`
 
-Probe how far one joint can really go. **Blocking** (like `/test/*`, at most ~14 s): stops the animation and any `/pose` move, holds the other joints where they are (PWM on), learns the holding current for 300 ms, moves the joint at 60°/s to its saved limit in that direction, then moves it slowly toward the hard cap. The sweep ends at the first of: a bump, the hard cap, **30°** past the saved limit, or 12 s since the start. The joint then backs off 4° from the angle of first contact and returns inside its soft limits. **Saves nothing**; the brain decides what to keep with `POST /ranges`. Needs a working INA219. JSON body.
+Probe how far one joint can really go. **Blocking** (like `/test/*`, at most ~14 s): stops the animation and any `/pose` move, holds the other joints where they are (PWM on; limp servos are switched on and given 400 ms to settle), learns the holding current for at least 300 ms, moves the joint at 60°/s to its saved limit in that direction, then moves it slowly toward the hard cap. The sweep ends at the first of: a bump, the hard cap, **30°** past the saved limit, or 12 s since the start. The joint then backs off 4° from the angle of first contact and returns inside its soft limits. **Saves nothing**; the brain decides what to keep with `POST /ranges`. Needs a working INA219. JSON body.
 
 | Field | Type | Range |
 | --- | --- | --- |
@@ -784,6 +784,7 @@ The bump threshold while exploring is `min(bump_threshold_ma, 400)` (400 when th
 | `409` | `current sensor not responding` | The INA219 stopped answering (see `sensor` in [`GET /ranges`](#get-ranges)) |
 | `409` | `implausible servo current; check INA219 VIN+/VIN- wiring` | Holding current after the settle is below 10 mA (or negative) or above 1500 mA: the shunt is reversed or not in the servo lead. Nothing moved |
 | `500` | `current sensor failed during explore` | 5 current reads in a row failed mid-run; the joint returns to where it started |
+| `500` | `could not read a steady servo current` | No holding-current baseline within 1 s of holding still (intermittent reads). Nothing moved |
 | `503` | `busy` | A serial `/play` stream holds the robot |
 
 ### `POST /bumps/clear`
@@ -810,9 +811,9 @@ With an INA219 at `0x41` (servo rail current, [interfaces](hardware/interfaces.m
 On a bump or stall the firmware:
 
 1. Switches the animation to `none` (without the `none` park) and stops every joint where it is.
-2. Blames the joints that moved in the last 250 ms (stall: the last ~2 s). For each, it takes the commanded angle from when the current **first** crossed the threshold (near first contact, not where the joint ran to), moves 4° back from it against the travel direction at 25°/s (on an outward move it stops at the saved mid when closer than that), and sets that side's soft limit to that angle ∓ 2°, never past the saved mid and never wider than before.
+2. Blames joints. **Bump:** every joint that moved in the last 250 ms, in the direction it was travelling. **Stall:** only when exactly one joint's own motion ended within the last 650 ms, pressing on the limit on its side of the saved mid (the reflex's own stops and back-offs never count as motion anyone can be blamed for). For each blamed joint, it takes the commanded angle from when the current **first** crossed the threshold (near first contact, not where the joint ran to), moves 4° back from it against the travel direction at 25°/s (on an outward move it stops at the saved mid when closer than that), and sets that side's soft limit to that angle ∓ 2°, never past the saved mid and never wider than before.
 3. Logs one entry per blamed joint ([`GET /ranges`](#get-ranges), `kind` `bump` or `stall`).
-4. A stall with no recently moved joint switches every servo output off instead.
+4. When no joint can be blamed with certainty, it switches every servo output off instead. While `POST /servos/park` holds the outputs on, such an event is logged once and ignored.
 
 Further events are ignored for 500 ms. The reflex never widens anything; only `POST /ranges` (validated) can. It is off in setup AP mode, with `bump_threshold_ma` = `0`, without the sensor, and while the sensor stops answering (5 failed reads in a row; it re-learns its baselines when reads come back).
 

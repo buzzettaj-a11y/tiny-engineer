@@ -405,7 +405,11 @@ void initMic() {
   if (xTaskCreate(buttonTask, "micbtn", kButtonStackBytes, nullptr, kButtonPriority, &g_buttonTask) !=
       pdPASS) {
     g_buttonTask = nullptr;
-    serialLogPrintln("[mic] button task start failed; button read in loop()");
+    // The privacy button now depends on loop(): a press during a blocking route
+    // (/play, /ranges/explore, tests) can be lost. (No raw Serial print: it
+    // would corrupt the framed USB serial protocol.)
+    serialLogPrintln("[mic] WARNING: button task start failed; GP7 read in loop() only, "
+                     "presses during blocking routes can be missed");
   }
 
   if (g_hostLock == nullptr || I2S.rxChan() == nullptr) {

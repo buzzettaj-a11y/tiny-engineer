@@ -167,6 +167,7 @@ import pytest
     (409, "current sensor not responding", "isn't answering"),
     (409, "implausible servo current; check INA219 VIN+/VIN- wiring", "swapped"),
     (500, "current sensor failed during explore", "stopped answering halfway"),
+    (500, "could not read a steady servo current", "steady reading"),
 ])
 def test_explore_sensor_faults_stop_the_run(robot, status, error, expect):
     robot.explore_error = (status, error)

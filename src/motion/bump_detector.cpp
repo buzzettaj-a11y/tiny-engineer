@@ -221,6 +221,18 @@ void MotionTracker::observe(
 ) {
   for (int j = 0; j < SERVO_COUNT; j++) {
     const bool slewing = std::fabs(targets[j] - angles[j]) >= SERVO_ANGLE_DEADBAND_DEG;
+
+    if (claimed_[j] && targets[j] == claimedTargets_[j]) {
+      // Reflex-owned move: "moving" for the detector, not blamable.
+      if (slewing) {
+        anyEver_ = true;
+        anyLastMs_ = nowMs;
+      }
+      lastTargets_[j] = targets[j];
+      continue;
+    }
+
+    claimed_[j] = false;
     const bool retargeted = seen_ && targets[j] != lastTargets_[j];
 
     if (slewing || retargeted) {
@@ -240,6 +252,14 @@ void MotionTracker::observe(
   }
 
   seen_ = true;
+}
+
+void MotionTracker::claim(const float targets[SERVO_COUNT]) {
+  for (int j = 0; j < SERVO_COUNT; j++) {
+    claimed_[j] = true;
+    claimedTargets_[j] = targets[j];
+    lastTargets_[j] = targets[j];
+  }
 }
 
 void MotionTracker::noteMotion(uint32_t nowMs) {
@@ -263,6 +283,30 @@ BumpDir MotionTracker::jointDir(int joint) const {
     return BumpDir::Max;
   }
   return jointDir_[joint];
+}
+
+int stallBlameJoint(const MotionTracker& motion, uint32_t nowMs) {
+  int found = -1;
+
+  for (int j = 0; j < SERVO_COUNT; j++) {
+    if (!motion.jointRecent(j, nowMs, BUMP_STALL_BLAME_MS)) {
+      continue;
+    }
+    if (found >= 0) {
+      return -1;
+    }
+    found = j;
+  }
+
+  return found;
+}
+
+bool stallDir(float angle, float savedMid, BumpDir& out) {
+  if (std::fabs(angle - savedMid) < SERVO_ANGLE_DEADBAND_DEG) {
+    return false;
+  }
+  out = angle > savedMid ? BumpDir::Max : BumpDir::Min;
+  return true;
 }
 
 // BumpLog --------------------------------------------------------------------

@@ -56,6 +56,9 @@ class BumpDetector {
 public:
   BumpEvent update(const BumpSample& sample);
   void reset();
+  // Ends a running cooldown (explore: a stall while settling must not blind
+  // the sweep that follows).
+  void clearCooldown() { cooling_ = false; }
 
   // A baseline for the given output state exists (enough still samples).
   bool armed(bool outputsOn) const;
@@ -112,6 +115,10 @@ public:
   void observe(uint32_t nowMs, const float angles[SERVO_COUNT], const float targets[SERVO_COUNT]);
   // Motion that is not visible per joint (a /pose move in flight, explore).
   void noteMotion(uint32_t nowMs);
+  // The reflex owns these targets (its own stop and back-off). While a joint's
+  // target stays at the claimed value its motion still counts as "moving" but is
+  // never blamed and never sets the joint's direction. Any other target ends it.
+  void claim(const float targets[SERVO_COUNT]);
 
   // Any motion within BUMP_MOTION_TAIL_MS.
   bool active(uint32_t nowMs) const;
@@ -123,12 +130,27 @@ public:
 private:
   bool seen_ = false;
   float lastTargets_[SERVO_COUNT] = {};
+  bool claimed_[SERVO_COUNT] = {};
+  float claimedTargets_[SERVO_COUNT] = {};
   bool jointEver_[SERVO_COUNT] = {};
   uint32_t jointLastMs_[SERVO_COUNT] = {};
   BumpDir jointDir_[SERVO_COUNT] = {};
   bool anyEver_ = false;
   uint32_t anyLastMs_ = 0;
 };
+
+// A stall is pinned on a joint only when exactly one joint's own (non-reflex)
+// motion ended within this window: a stall fires BUMP_MOTION_TAIL_MS +
+// BUMP_STALL_MS after the last motion when the joint was pressing all along.
+constexpr uint32_t BUMP_STALL_BLAME_MS = BUMP_MOTION_TAIL_MS + BUMP_STALL_MS + 100;
+
+// The one joint a stall can be pinned on, or -1 when blame is uncertain (none,
+// or several): then the caller releases the outputs instead of narrowing.
+int stallBlameJoint(const MotionTracker& motion, uint32_t nowMs);
+
+// Which limit a stalled joint is pressing on: the side of its saved mid it sits
+// on (never the last slew, which may be a back-off). False when it sits at mid.
+bool stallDir(float angle, float savedMid, BumpDir& out);
 
 constexpr size_t BUMP_LOG_CAPACITY = 32;
 constexpr size_t BUMP_ANIM_NAME_LEN = 15;

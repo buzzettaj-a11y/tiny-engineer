@@ -135,7 +135,8 @@ Does **not** save; the brain decides. Errors: 409 `no current sensor` (no
 INA219), 409 `current sensor not responding`, 409 `implausible servo current;
 check INA219 VIN+/VIN- wiring` (holding current < 10 mA, negative, or > 1500 mA;
 nothing moved), 500 `current sensor failed during explore` (reads failed
-mid-run; the joint goes back to where it started).
+mid-run; the joint goes back to where it started), 500 `could not read a
+steady servo current` (no baseline within 1 s of holding still; nothing moved).
 
 ### `POST /bumps/clear`
 Empties the bump list and resets soft limits to saved. `{"ok":true}`.
@@ -163,13 +164,17 @@ Empties the bump list and resets soft limits to saved. `{"ok":true}`.
 2. A **bump** is current above `baseline + bump_threshold_ma` for **≥ 60 ms**
    while moving, or ≥ 2500 mA at once. A **stall** is the same excess for
    **≥ 300 ms** with powered servos and no motion.
-3. On either: stop every joint where it is, and for each joint that moved in
-   the last 250 ms (stall: ~2 s) take its commanded angle from when the current
+3. On either: stop every joint where it is. Blame: for a bump, every joint that
+   moved in the last 250 ms (travel direction); for a stall, only the single
+   joint whose own motion ended within 650 ms, direction = its side of saved
+   mid. The reflex's own stops/back-offs are never blamable. For each blamed
+   joint take its commanded angle from when the current
    first crossed the threshold, move it back **4°** against its travel direction
    at normal speed (not past saved mid on an outward move), set its soft limit on
    that side to `angle − 2°` (never past saved mid), log an entry per joint
-   (`kind` `bump`/`stall`), and put the animation in `none`. A stall with no
-   recently moved joint switches all servo outputs off.
+   (`kind` `bump`/`stall`), and put the animation in `none`. No certain blame
+   = switch all servo outputs off (ignored, logged once, while `/servos/park`
+   holds them).
 4. Ignore events for 500 ms after one. Off when the INA219 stops answering.
 
 The reflex never widens anything. Only `POST /ranges` (validated) can.

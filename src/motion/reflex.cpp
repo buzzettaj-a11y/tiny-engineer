@@ -26,8 +26,8 @@ constexpr uint32_t kCurrentPollMs = 5;
 // Skip detection this long after a released servo output switches back on:
 // a joint that drooped while limp snaps back with a short current spike.
 constexpr uint32_t kOutputWakeIgnoreMs = 400;
-// A stall is blamed on joints that moved within this window.
-constexpr uint32_t kStallBlameMs = BUMP_MOTION_TAIL_MS + BUMP_STALL_MS + 1500;
+// Explore: longest wait for the holding-current baseline after the settle.
+constexpr uint32_t kExploreArmTimeoutMs = 1000;
 // Bump back-off and explore return moves.
 constexpr float kBackoffSpeedDegS = anim::TRANSITION_TORSO_SPEED_DEG_S;
 // Explore: move to the saved limit at this speed, then sweep at the asked speed.
@@ -48,6 +48,7 @@ uint32_t g_lastReadMs = 0;
 bool g_currentValid = false;
 float g_currentMa = 0.0f;
 bool g_sensorWasHealthy = true;
+bool g_loggedHoldEvent = false;
 
 void resetSoftFromSaved() {
   for (int i = 0; i < SERVO_COUNT; i++) {
@@ -117,9 +118,19 @@ void observeMotion(uint32_t nowMs) {
   }
 }
 
+// The reflex's own stop and back-off are not "motion" anyone can be blamed for.
+void claimReflexTargets() {
+  float targets[SERVO_COUNT];
+
+  for (int j = 0; j < SERVO_COUNT; j++) {
+    targets[j] = servoAt(j).target();
+  }
+
+  g_motion.claim(targets);
+}
+
 void onEvent(BumpEvent event, uint32_t nowMs) {
   const bool stall = event == BumpEvent::Stall;
-  const uint32_t blameMs = stall ? kStallBlameMs : BUMP_MOTION_TAIL_MS;
 
   struct Hit {
     int joint;
@@ -130,19 +141,42 @@ void onEvent(BumpEvent event, uint32_t nowMs) {
   Hit hits[SERVO_COUNT];
   size_t hitCount = 0;
 
-  for (int j = 0; j < SERVO_COUNT; j++) {
-    if (!g_motion.jointRecent(j, nowMs, blameMs)) {
-      continue;
-    }
+  // Commanded angle when the over-threshold window opened (near first contact),
+  // not the one now, which has run further into the obstacle.
+  auto contactAngle = [](int j) {
+    return g_detector.eventAnglesValid() ? g_detector.eventAngle(j) : servoAt(j).angle();
+  };
 
-    // Commanded angle when the over-threshold window opened (near first
-    // contact), not the one now, which has run further into the obstacle.
-    const float angle = g_detector.eventAnglesValid() ? g_detector.eventAngle(j)
-                                                      : servoAt(j).angle();
-    hits[hitCount++] = {j, angle, g_motion.jointDir(j)};
+  if (stall) {
+    // Only a single joint whose own motion just ended, pressing on the limit on
+    // its side of mid. Anything less certain: let go instead of narrowing.
+    const int j = stallBlameJoint(g_motion, nowMs);
+    BumpDir dir = BumpDir::Max;
+
+    if (j >= 0 && stallDir(contactAngle(j), servoRuntimeMid(j), dir)) {
+      hits[hitCount++] = {j, contactAngle(j), dir};
+    }
+  } else {
+    for (int j = 0; j < SERVO_COUNT; j++) {
+      if (g_motion.jointRecent(j, nowMs, BUMP_MOTION_TAIL_MS)) {
+        hits[hitCount++] = {j, contactAngle(j), g_motion.jointDir(j)};
+      }
+    }
   }
 
   const float peakMa = g_detector.eventPeakMa();
+
+  if (hitCount == 0 && servoOutputsHoldActive()) {
+    // /servos/park holds PWM until reboot, so releasing is a no-op; leave the
+    // pose alone and say so once instead of firing every cooldown.
+    if (!g_loggedHoldEvent) {
+      g_loggedHoldEvent = true;
+      serialLogPrint("[bump] high current during park hold; ma=");
+      serialLogPrint(peakMa, 0);
+      serialLogPrintln("; outputs held, ignoring");
+    }
+    return;
+  }
 
   // Copy before the switch to none: the log names what was running.
   char animName[BUMP_ANIM_NAME_LEN + 1];
@@ -154,14 +188,17 @@ void onEvent(BumpEvent event, uint32_t nowMs) {
   anim::stopAnimServos();
 
   if (hitCount == 0) {
-    // High current, nothing moved lately: let go instead of pushing on.
+    // High current, blame uncertain: let go instead of pushing on.
     serialLogPrint(stall ? "[bump] stall" : "[bump] bump");
-    serialLogPrint(" with no recent motion; ma=");
+    serialLogPrint(" without a joint to blame; ma=");
     serialLogPrint(peakMa, 0);
     serialLogPrintln("; releasing servo outputs");
     releaseAllServoOutputs();
+    claimReflexTargets();
     return;
   }
+
+  g_loggedHoldEvent = false;
 
   for (size_t i = 0; i < hitCount; i++) {
     const Hit& hit = hits[i];
@@ -185,6 +222,8 @@ void onEvent(BumpEvent event, uint32_t nowMs) {
     serialLogPrint(" anim=");
     serialLogPrintln(animName);
   }
+
+  claimReflexTargets();
 }
 
 // Explore helpers -----------------------------------------------------------
@@ -233,20 +272,32 @@ struct ExploreRun {
     return static_cast<int32_t>(millis() - deadlineMs) >= 0;
   }
 
-  // Holds still for `ms` while the baseline learns the holding current
-  // (longer if outputs just woke: that spike stays out of the baseline).
+  // Waits out a servo-output wake (that spike stays out of the baseline), then
+  // holds still for `ms` of samples and until the holding-current baseline is
+  // armed, at most kExploreArmTimeoutMs. Callers check armed() afterwards.
   void settle(uint32_t ms) {
-    const uint32_t start = millis();
-
-    while ((millis() - start < ms || outputsWaking(millis())) && !sensorFailed) {
-      if (outputsWaking(millis())) {
-        float ma = 0.0f;
-        readCurrent(ma);
-      } else {
-        sample(false);
-      }
+    while (outputsWaking(millis()) && !timedOut()) {
+      float ma = 0.0f;
+      readCurrent(ma);
       delay(kExploreStepMs);
     }
+
+    const uint32_t start = millis();
+
+    while (!sensorFailed && !timedOut()) {
+      const uint32_t elapsed = millis() - start;
+
+      if (elapsed >= kExploreArmTimeoutMs ||
+          (elapsed >= ms && detector.armed(true))) {
+        break;
+      }
+
+      sample(false);
+      delay(kExploreStepMs);
+    }
+
+    // A stall while holding still must not blind the next sweep's first 500 ms.
+    detector.clearCooldown();
   }
 
   // Drives `joint` to `target` at `speedDegS` (hard-clamped writes).
@@ -499,9 +550,18 @@ ExploreResult motionExplore(int joint, BumpDir dir, float speedDegS) {
     return result;
   }
 
-  // Holding current of powered servos is always positive; a missing, tiny or
-  // negative baseline means the shunt is not in the servo lead the right way round.
-  if (!run.detector.armed(true) || !exploreBaselinePlausible(run.detector.baselineMa(true))) {
+  if (!run.detector.armed(true)) {
+    // Not enough good still samples within kExploreArmTimeoutMs (flaky reads).
+    activitySetExploring(false);
+    serialLogPrintln("[explore] could not learn the holding current");
+    result.code = 500;
+    result.error = "could not read a steady servo current";
+    return result;
+  }
+
+  // Holding current of powered servos is always positive; a tiny or negative
+  // baseline means the shunt is not in the servo lead the right way round.
+  if (!exploreBaselinePlausible(run.detector.baselineMa(true))) {
     activitySetExploring(false);
     serialLogPrint("[explore] implausible holding current ");
     serialLogPrintln(run.detector.baselineMa(true), 1);
