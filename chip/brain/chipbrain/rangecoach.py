@@ -182,6 +182,31 @@ def apply(r: Ranges, adjs: list[Adjustment]) -> dict:
     return {"servo_mins": clean(mins), "servo_maxs": clean(maxs)}
 
 
+def explore_stop_message(e: "RobotError") -> str | None:
+    """Spoken reason to abandon a whole explore run, or None to just skip one side.
+
+    The firmware refuses explore with 409 when the current sensor is missing,
+    not answering, or reads implausibly (e.g. VIN+/VIN- swapped), and with 500
+    when the sensor fails mid-sweep. None of those get better on the next joint.
+    """
+    err = ""
+    if isinstance(e.body, dict):
+        err = str(e.body.get("error", ""))
+    err = (err or str(e)).lower()
+    if e.status == 409:
+        if "no current sensor" in err:
+            return "I can't feel my limits without the current sensor."
+        if "not responding" in err:
+            return "My current sensor isn't answering, so I stopped. Check its wires."
+        if "implausible" in err:
+            return ("My current sensor reading looks wrong, so I stopped. "
+                    "Check that its VIN plus and VIN minus wires aren't swapped.")
+        return "I couldn't check my limits: " + err + "."
+    if e.status == 500 and "sensor" in err:
+        return "My current sensor stopped answering halfway, so I stopped."
+    return None
+
+
 def plan_explore(r: Ranges, results: list[dict], max_gain: float, min_span: float) -> list[Adjustment]:
     """Turn /ranges/explore results into new saved limits (grow <= max_gain)."""
     out: list[Adjustment] = []
@@ -302,8 +327,10 @@ class RangeCoach:
                         res = await self.robot.post(
                             "/ranges/explore", {"joint": j, "dir": side, "speed": self.cfg.explore_speed}, timeout=120)
                     except RobotError as e:
-                        if e.status == 409:
-                            return "I can't feel my limits without the current sensor."
+                        stop = explore_stop_message(e)
+                        if stop:
+                            log.warning("explore %s %s stopped: %s", JOINTS[j], side, e)
+                            return stop
                         log.warning("explore %s %s failed: %s", JOINTS[j], side, e)
                         continue
                     res.setdefault("joint", j)

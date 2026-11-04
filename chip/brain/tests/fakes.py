@@ -71,6 +71,7 @@ class FakeRobot:
         self.soft_maxs = list(self.saved_maxs)
         self.bumps: list[dict] = []
         self.explore_safe: dict = {}  # (joint, dir) -> safe deg
+        self.explore_error: tuple | None = None  # (status, error message) to refuse explore with
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self.server.daemon_threads = True
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -210,6 +211,8 @@ class FakeRobot:
         if p == "/ranges/explore":
             if not self.sensor:
                 return 409, {"ok": False, "error": "no current sensor"}
+            if self.explore_error:
+                return self.explore_error[0], {"ok": False, "error": self.explore_error[1]}
             j, d = data["joint"], data["dir"]
             safe = self.explore_safe.get((j, d))
             if safe is None:

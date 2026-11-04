@@ -158,3 +158,27 @@ def test_adjust_rejects_bad_joint(robot, joint):
         return out
 
     assert "Unknown joint" in _run(go())
+
+
+import pytest
+
+
+@pytest.mark.parametrize("status,error,expect", [
+    (409, "current sensor not responding", "isn't answering"),
+    (409, "implausible servo current; check INA219 VIN+/VIN- wiring", "swapped"),
+    (500, "current sensor failed during explore", "stopped answering halfway"),
+])
+def test_explore_sensor_faults_stop_the_run(robot, status, error, expect):
+    robot.explore_error = (status, error)
+
+    async def go():
+        client = RobotClient(robot.url)
+        client.start()
+        coach = RangeCoach(client, RangesCfg(), State(None))
+        out = await coach.explore([0, 1])
+        await client.stop()
+        return out
+
+    before = (list(robot.saved_mins), list(robot.saved_maxs))
+    assert expect in _run(go())
+    assert (robot.saved_mins, robot.saved_maxs) == before  # nothing saved
