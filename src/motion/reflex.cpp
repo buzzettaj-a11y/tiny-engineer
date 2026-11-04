@@ -148,13 +148,14 @@ void onEvent(BumpEvent event, uint32_t nowMs) {
   };
 
   if (stall) {
-    // Only a single joint whose own motion just ended, pressing on the limit on
-    // its side of mid. Anything less certain: let go instead of narrowing.
+    // Only a single joint whose own motion just ended. Anything less certain:
+    // let go instead of narrowing. Its direction is the direction of that move
+    // (reflex back-offs are claimed and never change it), so the back-off goes
+    // away from whatever it pressed into, even when it was moving toward mid.
     const int j = stallBlameJoint(g_motion, nowMs);
-    BumpDir dir = BumpDir::Max;
 
-    if (j >= 0 && stallDir(contactAngle(j), servoRuntimeMid(j), dir)) {
-      hits[hitCount++] = {j, contactAngle(j), dir};
+    if (j >= 0) {
+      hits[hitCount++] = {j, contactAngle(j), g_motion.jointDir(j)};
     }
   } else {
     for (int j = 0; j < SERVO_COUNT; j++) {

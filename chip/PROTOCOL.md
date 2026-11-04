@@ -166,8 +166,9 @@ Empties the bump list and resets soft limits to saved. `{"ok":true}`.
    **≥ 300 ms** with powered servos and no motion.
 3. On either: stop every joint where it is. Blame: for a bump, every joint that
    moved in the last 250 ms (travel direction); for a stall, only the single
-   joint whose own motion ended within 650 ms, direction = its side of saved
-   mid. The reflex's own stops/back-offs are never blamable. For each blamed
+   joint whose own motion ended within 650 ms, direction = that move's travel
+   direction. The reflex's own stops/back-offs are never blamable and never
+   change a joint's direction. For each blamed
    joint take its commanded angle from when the current
    first crossed the threshold, move it back **4°** against its travel direction
    at normal speed (not past saved mid on an outward move), set its soft limit on
