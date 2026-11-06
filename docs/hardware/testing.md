@@ -11,7 +11,7 @@ Firmware is [`src/main.cpp`](../../src/main.cpp). Boot **inits** hardware and st
 - [`src/hardware/pca9685_servos.cpp`](../../src/hardware/pca9685_servos.cpp)
 - [`src/http/routes.cpp`](../../src/http/routes.cpp), [`src/http/test_handlers.cpp`](../../src/http/test_handlers.cpp)
 
-Constants: [`include/pins.h`](../../include/pins.h). Wi-Fi credentials are saved in NVS and configured only in setup AP mode (first boot, or after factory reset + power-cycle). Servo min/max, RGB LED mapping (`rgb_order`), and OLED rotation (`oled_rotate_180`) are also setup-AP-only; factory reset keeps them.
+Constants: [`include/pins.h`](../../include/pins.h). Wi-Fi credentials are saved in NVS and configured only in setup AP mode (first boot, or after factory reset + power-cycle). Servo min/max, RGB LED mapping (`rgb_order`), and OLED rotation (`oled_rotate_180`) are also setup-AP-only; factory reset keeps them. Factory reset also keeps `mute_switch` (it describes the wiring) but it is not setup-AP-only.
 
 Stock flash: **[Web flash](https://jamro.github.io/tiny-engineer/flash/)**. Build from source / serial (115200): [flash.md](../flash.md) (Advanced: PlatformIO — `pio run`, `pio run -t upload`). Physical board is **Waveshare ESP32-C3-Zero**; PlatformIO env name is `esp32-c3-devkitm-1`.
 
@@ -122,7 +122,7 @@ curl -X POST "http://tiny-engineer.local/test/servo" -H "Content-Type: applicati
 | `GET` | `/settings` | Persistent settings (`sleep_timeout`, `hostname`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `loading`, `eyes_style`, `access_token_set`, `wifi_configured`, `servo_mins`, `servo_maxs`, `rgb_order`, `oled_rotate_180`, `brain_host`, `brain_port`, `bump_threshold_ma`, `mic_shift`, `mute_switch`, `wifi_networks`) |
 | `POST` | `/settings` | Update NVS settings from a JSON object; the reply carries `reboot_required`, true once `hostname`, `loading` or the WiFi networks differ from what the robot booted with. `servo_mins` / `servo_maxs` (integer arrays), `rgb_order` and `oled_rotate_180` (boolean) are setup-AP-only |
 | `PUT` | `/settings/wifi` | Replace the saved WiFi networks (JSON array of 1 to 5); first one tested in setup AP mode |
-| `POST` | `/settings/reset` | Factory reset settings to defaults (clears WiFi, keeps servo ranges, RGB mapping, and screen rotation); power-cycle to reopen setup AP |
+| `POST` | `/settings/reset` | Factory reset settings to defaults (clears WiFi, keeps servo ranges, RGB mapping, screen rotation, and `mute_switch`); power-cycle to reopen setup AP |
 | `POST` | `/servos/park` | Center all servos at mid, flush pose NVS, hold PWM until reboot |
 | `POST` | `/test/audio` | `{"ok":true,"test":"audio"}` after `runSoundTest()` |
 | `POST` | `/test/audio/bell` | `{"ok":true,"test":"bell"}` after `playBell()` |

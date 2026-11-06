@@ -231,7 +231,7 @@ void test_bump_threshold() {
   TEST_ASSERT_TRUE(settingsValidateBumpThreshold(650));
   TEST_ASSERT_TRUE(settingsValidateBumpThreshold(3000));
   TEST_ASSERT_FALSE(settingsValidateBumpThreshold(3001));
-  TEST_ASSERT_EQUAL_UINT16(650, SETTINGS_DEFAULT_BUMP_THRESHOLD_MA);
+  TEST_ASSERT_EQUAL_UINT16(300, SETTINGS_DEFAULT_BUMP_THRESHOLD_MA);
 }
 
 void test_mic_shift() {

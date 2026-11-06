@@ -132,7 +132,7 @@ curl http://tiny-engineer.local/settings
   "oled_rotate_180": false,
   "brain_host": "192.168.1.20",
   "brain_port": 47100,
-  "bump_threshold_ma": 650,
+  "bump_threshold_ma": 300,
   "mic_shift": 14,
   "mute_switch": false,
   "wifi_networks": ["MyNetwork", "Office"]
@@ -159,7 +159,7 @@ curl http://tiny-engineer.local/settings
 | `oled_rotate_180` | OLED 180° rotation (`true` → `setRotation(2)`). Default **`false`**. Setup AP only. Survives factory reset |
 | `brain_host` | Where the mic streams: IPv4 or hostname of the Chip brain. Default **`""`** (streaming off). See [Mic stream](#mic-stream-udp) |
 | `brain_port` | UDP port for the mic stream. Default **47100** |
-| `bump_threshold_ma` | Bump reflex: servo-rail current above the idle baseline that counts as a bump (after 60 ms while moving). Default **650**; `0` disables the reflex. Needs the INA219 ([Bump reflex](#bump-reflex)) |
+| `bump_threshold_ma` | Bump reflex: servo-rail current above the idle baseline that counts as a bump (after 60 ms while moving). Default **300** (one stalled SG90 can draw as little as ~360 mA, so higher values may miss a single jammed joint; raise it if Chip stops when nothing is in the way); `0` disables the reflex. Needs the INA219 ([Bump reflex](#bump-reflex)) |
 | `mic_shift` | Mic gain: 16-bit sample = saturate(32-bit I2S slot >> `mic_shift`). Lower = louder, 6 dB per step. Default **14** |
 | `mute_switch` | What is wired to GP7: `false` = momentary mute button, each press toggles mute (default); `true` = maintained on/off switch whose position **is** the mute state: closed to GND ("I") = listening, open ("O", or a broken wire) = muted. In switch mode `POST /mic` is refused. Applies immediately. Survives factory reset. See [`POST /mic`](#post-mic) |
 | `reboot_required` | `true` once the saved `hostname`, `loading` or WiFi networks differ from what this boot started with; those apply only after a reboot |
@@ -180,7 +180,7 @@ curl -X POST "http://192.168.4.1/settings" \
   -d '{"servo_mins":[80,80,80,80,80],"servo_maxs":[100,100,100,100,100],"rgb_order":"GRB","oled_rotate_180":true}'
 curl -X POST "http://tiny-engineer.local/settings" \
   -H "Content-Type: application/json" \
-  -d '{"brain_host":"192.168.1.20","brain_port":47100,"bump_threshold_ma":650,"mic_shift":14}'
+  -d '{"brain_host":"192.168.1.20","brain_port":47100,"bump_threshold_ma":300,"mic_shift":14}'
 ```
 
 ```json
@@ -203,7 +203,7 @@ curl -X POST "http://tiny-engineer.local/settings" \
   "oled_rotate_180": false,
   "brain_host": "",
   "brain_port": 47100,
-  "bump_threshold_ma": 650,
+  "bump_threshold_ma": 300,
   "mic_shift": 14,
   "mute_switch": false,
   "wifi_networks": ["MyNetwork"],
@@ -229,7 +229,7 @@ curl -X POST "http://tiny-engineer.local/settings" \
 | `oled_rotate_180` | boolean | Setup AP only; default `false` |
 | `brain_host` | string | 0–63 chars, `[A-Za-z0-9.-]` (hostname or IPv4), not starting with `-` or `.` nor ending with `-`; empty turns the mic stream off; default empty |
 | `brain_port` | integer | 1–65535; default `47100` |
-| `bump_threshold_ma` | integer | 0–3000 mA; `0` disables the bump reflex; default `650` |
+| `bump_threshold_ma` | integer | 0–3000 mA; `0` disables the bump reflex; default `300` |
 | `mic_shift` | integer | 8–20; default `14` |
 | `mute_switch` | boolean | `false` = GP7 mute button (each press toggles), `true` = GP7 on/off switch (open = muted); default `false` |
 
@@ -283,7 +283,7 @@ curl -X POST "http://tiny-engineer.local/settings/reset"
   "oled_rotate_180": false,
   "brain_host": "",
   "brain_port": 47100,
-  "bump_threshold_ma": 650,
+  "bump_threshold_ma": 300,
   "mic_shift": 14,
   "mute_switch": false,
   "wifi_networks": [],
@@ -717,7 +717,7 @@ curl http://tiny-engineer.local/ranges
   "hard_maxs": [170, 170, 170, 170, 170],
   "current_ma": 123.4,
   "sensor": true,
-  "bump_threshold_ma": 650,
+  "bump_threshold_ma": 300,
   "bumps": [
     { "t_ms": 812345, "joint": 0, "angle": 130.2, "dir": "max", "current_ma": 980.1, "anim": "typing", "kind": "bump" }
   ]
@@ -783,7 +783,7 @@ curl -X POST "http://tiny-engineer.local/ranges/explore" -H "Content-Type: appli
 | `safe` | Angle 4° back toward the saved mid from first contact (for `bump`) or from `stopped_at` (degrees, inside the hard caps) |
 | `peak_ma` | Highest servo-rail current while moving (mA) |
 
-The bump threshold while exploring is `min(bump_threshold_ma, 400)` (400 when the setting is `0`). Explore bumps do not enter the bump log or change the soft limits.
+The bump threshold while exploring is `min(bump_threshold_ma, 250)` (250 when the setting is `0`). Explore bumps do not enter the bump log or change the soft limits.
 
 | Status | `error` | When |
 | --- | --- | --- |

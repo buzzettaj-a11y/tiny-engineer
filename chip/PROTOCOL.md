@@ -108,7 +108,7 @@ delay) so servo noise stays off the mic. Eyes attentive/wide. Allowed as a
  "soft_mins":[..5],  "soft_maxs":[..5],
  "hard_mins":[..5],  "hard_maxs":[..5],
  "current_ma": 123.4, "sensor": true,
- "bump_threshold_ma": 650, "bumps":[ ... see below ... ]}
+ "bump_threshold_ma": 300, "bumps":[ ... see below ... ]}
 ```
 * `saved_*`: the NVS calibration (what animations use).
 * `soft_*`: runtime limits after bumps (RAM only, start = saved). Animations and
@@ -133,7 +133,7 @@ Blocking (like `/test/*`, at most ~14 s): stops animations, holds other joints,
 learns the holding current, moves the joint to its saved limit, then slowly
 toward the hard limit. The sweep ends at a bump, the hard limit, **30° past the
 saved limit**, or 12 s, whichever comes first. Bump threshold while exploring:
-`min(bump_threshold_ma, 400)`. Backs off 4° from first contact, returns
+`min(bump_threshold_ma, 250)`. Backs off 4° from first contact, returns
 `{"ok":true,"joint":j,"dir":"max","stopped_at":deg,"reason":"bump"|"hard_limit"|"max_travel","safe":deg,"peak_ma":..}`.
 `max_travel` = stopped by the 30° / 12 s bound with nothing felt.
 Does **not** save; the brain decides. Errors: 409 `no current sensor` (no
@@ -151,7 +151,7 @@ Empties the bump list and resets soft limits to saved. `{"ok":true}`.
 | --- | --- | --- | --- |
 | `brain_host` | string 0–63 | `""` | where to stream the mic |
 | `brain_port` | int 1–65535 | 47100 | UDP port |
-| `bump_threshold_ma` | int 0–3000 | 650 | 0 disables the reflex |
+| `bump_threshold_ma` | int 0–3000 | 300 | 0 disables the reflex |
 | `mic_shift` | int 8–20 | 14 | 16-bit sample = saturate(int32 slot >> `mic_shift`); lower = louder (6 dB per step) |
 | `mute_switch` | bool | false | GP7 is a maintained on/off switch (open = muted) instead of a momentary toggle button. Kept by factory reset |
 

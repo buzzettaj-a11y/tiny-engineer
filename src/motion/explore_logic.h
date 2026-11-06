@@ -10,7 +10,7 @@
 constexpr float EXPLORE_MAX_EXCURSION_DEG = 30.0f;
 // Bump threshold used while exploring: min(bump_threshold_ma, this). A setting
 // of 0 (reflex off) explores with this value.
-constexpr uint16_t EXPLORE_THRESHOLD_CAP_MA = 400;
+constexpr uint16_t EXPLORE_THRESHOLD_CAP_MA = 250;
 // After the settle, the powered-but-still current must look like real servo
 // holding current. Below the minimum (incl. negative) = shunt wired backwards
 // (VIN+/VIN- swapped) or not in the servo lead.

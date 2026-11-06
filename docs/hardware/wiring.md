@@ -18,6 +18,7 @@ Build the harness **on the desk** ([getting-started](../getting-started.md) — 
 2. Signal wires: I2C (SDA/SCL), I2S (BCLK/LRC/DIN), USB D+/D−, PCA9685 OE (GP5 → OE).
 3. Logic **3V3**: ESP32 **3V3** → PCA9685 **VCC** and OLED **VCC**.
 4. **5 V** last: USB VBUS → ESP32 **5V**, PCA9685 **5V**, MAX98357A **Vin**. Leave servo leads unplugged until centering.
+   - **With the optional INA219 (bump sensing):** the PCA9685's servo power must come **only** through it: VBUS → INA219 **VIN+** → **VIN−** → PCA9685 terminal-block **V+**, and nothing else on V+ (not the V+ pins of either 6-pin side header). Any second path lets servo current bypass the sensor and the bump reflex goes blind. ESP32 5V and MAX98357A Vin stay on the VBUS side.
 
 Source of truth for *what is connected to what*: [`docs/wiring/Tiny Engineer.drawio.png`](../wiring/Tiny%20Engineer.drawio.png) ([`.drawio`](../wiring/Tiny%20Engineer.drawio)).
 
@@ -145,7 +146,7 @@ ESP32-C3-Zero, unused in the PNG:
 
 **GP6, GP7, GP8, GP9, GP10, GP20, GP21**
 
-Optional Chip parts use two of them: **GP6** ← INMP441 **SD** (mic SCK/WS share GP2/GP3 with the amp, L/R to GND, VDD to 3V3) and **GP7** ← mute button to GND (or a maintained on/off switch with setting `mute_switch` on: open = muted). An optional INA219 (A0 bridged, `0x41`) sits on the I2C bus with VIN+/VIN− in series with the 5 V lead to PCA9685 **V+** — [interfaces.md](interfaces.md).
+Optional Chip parts use two of them: **GP6** ← INMP441 **SD** (mic SCK/WS share GP2/GP3 with the amp, L/R to GND, VDD to 3V3) and **GP7** ← mute button to GND (or a maintained on/off switch with setting `mute_switch` on: open = muted). An optional INA219 (A0 bridged, `0x41`) sits on the I2C bus with VIN+/VIN− in series with the 5 V lead to PCA9685 **V+**, which must be the PCA9685's **only** servo-power input — [interfaces.md](interfaces.md). An I2C scan should then show exactly `0x3C`, `0x40` and `0x41`.
 
 Wire **GP5** → PCA9685 **OE** (`PCA9685_OE_PIN`; active LOW). The base PNG may omit that wire — add it on the breadboard and on the Adafruit breakout OE pin. GP9 = BOOT, GP10 = onboard WS2812. GP18/GP19 = native USB — wire from 5993 D−/D+ even if the base PNG omits them. See [pinout.md](pinout.md).
 
