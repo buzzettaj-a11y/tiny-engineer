@@ -99,7 +99,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://tiny-engineer.local/health
 | `setup_ap_ip` | Setup AP IP when `provisioning` is true (usually `192.168.4.1`), else `""` |
 | `oled` | SSD1306 probed and initialized |
 | `mic.present` | INMP441 data seen (non-constant samples) since boot; `false` without a mic |
-| `mic.muted` | Mic muted (button on GP7 or [`POST /mic`](#post-mic)); saved in NVS |
+| `mic.muted` | Mic muted (GP7 button or switch, or [`POST /mic`](#post-mic)) |
 | `mic.streaming` | UDP mic packets are reaching the network stack ([Mic stream](#mic-stream-udp)) |
 | `current_ma` | Servo-rail current from the optional INA219 (mA, one decimal), or `null` without the sensor or while it stops answering (5 failed reads in a row; retried once a second) |
 | `bumps` | Entries in the bump log ([`GET /ranges`](#get-ranges)) |
@@ -134,6 +134,7 @@ curl http://tiny-engineer.local/settings
   "brain_port": 47100,
   "bump_threshold_ma": 650,
   "mic_shift": 14,
+  "mute_switch": false,
   "wifi_networks": ["MyNetwork", "Office"]
 }
 ```
@@ -160,11 +161,12 @@ curl http://tiny-engineer.local/settings
 | `brain_port` | UDP port for the mic stream. Default **47100** |
 | `bump_threshold_ma` | Bump reflex: servo-rail current above the idle baseline that counts as a bump (after 60 ms while moving). Default **650**; `0` disables the reflex. Needs the INA219 ([Bump reflex](#bump-reflex)) |
 | `mic_shift` | Mic gain: 16-bit sample = saturate(32-bit I2S slot >> `mic_shift`). Lower = louder, 6 dB per step. Default **14** |
+| `mute_switch` | What is wired to GP7: `false` = momentary mute button, each press toggles mute (default); `true` = maintained on/off switch whose position **is** the mute state: closed to GND ("I") = listening, open ("O", or a broken wire) = muted. In switch mode `POST /mic` is refused. Applies immediately. Survives factory reset. See [`POST /mic`](#post-mic) |
 | `reboot_required` | `true` once the saved `hostname`, `loading` or WiFi networks differ from what this boot started with; those apply only after a reboot |
 
 ### `POST /settings`
 
-Update one or more settings from a JSON object body. Values are written to NVS. `sleep_timeout`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `eyes_style`, `access_token`, `brain_host`, `brain_port`, `bump_threshold_ma`, and `mic_shift` apply immediately; a changed `hostname` or `loading` takes effect on the **next reboot**. WiFi networks are set with [`PUT /settings/wifi`](#put-settingswifi). Servo ranges (`servo_mins` + `servo_maxs`), RGB LED mapping (`rgb_order`) and OLED rotation (`oled_rotate_180`) are **setup AP only** and apply immediately. Requires Bearer when auth is enabled.
+Update one or more settings from a JSON object body. Values are written to NVS. `sleep_timeout`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `eyes_style`, `access_token`, `brain_host`, `brain_port`, `bump_threshold_ma`, `mic_shift`, and `mute_switch` apply immediately; a changed `hostname` or `loading` takes effect on the **next reboot**. WiFi networks are set with [`PUT /settings/wifi`](#put-settingswifi). Servo ranges (`servo_mins` + `servo_maxs`), RGB LED mapping (`rgb_order`) and OLED rotation (`oled_rotate_180`) are **setup AP only** and apply immediately. Requires Bearer when auth is enabled.
 
 ```bash
 curl -X POST "http://tiny-engineer.local/settings" \
@@ -203,6 +205,7 @@ curl -X POST "http://tiny-engineer.local/settings" \
   "brain_port": 47100,
   "bump_threshold_ma": 650,
   "mic_shift": 14,
+  "mute_switch": false,
   "wifi_networks": ["MyNetwork"],
   "reboot_required": true
 }
@@ -228,6 +231,7 @@ curl -X POST "http://tiny-engineer.local/settings" \
 | `brain_port` | integer | 1–65535; default `47100` |
 | `bump_threshold_ma` | integer | 0–3000 mA; `0` disables the bump reflex; default `650` |
 | `mic_shift` | integer | 8–20; default `14` |
+| `mute_switch` | boolean | `false` = GP7 mute button (each press toggles), `true` = GP7 on/off switch (open = muted); default `false` |
 
 Leave out a field to keep its saved value. An empty object → **400** `send at least one setting`. A field this route does not know → **400** `unknown field <field>`. A field with the wrong type or out of range → **400** `invalid <field>` (servo ranges that overlap or exceed 180: `invalid servo_mins or servo_maxs`). Only one of `servo_mins` / `servo_maxs` → **400** `servo_mins and servo_maxs go together`. On any 400, nothing is saved. Outside setup AP mode, servo ranges → **400** `servo setup only in AP mode`, `rgb_order` → **400** `rgb setup only in AP mode`, `oled_rotate_180` → **400** `oled setup only in AP mode`. Replies carry `reboot_required` as in `GET /settings`.
 
@@ -252,7 +256,7 @@ The list must hold 1 to 5 networks, so the robot always has one to try; factory 
 
 ### `POST /settings/reset`
 
-Factory reset: clears the NVS `te` namespace and restores settings to compile-time defaults and clears every saved WiFi network. **Servo min/max, RGB LED mapping (`rgb_order`), and OLED rotation (`oled_rotate_180`) are kept.** Internal last-pose blob (`spose`) is cleared/reset with defaults. The Chip settings (`brain_host`, `brain_port`, `bump_threshold_ma`, `mic_shift`) return to their defaults, and the saved mic mute (`mic_mute`) is cleared: the mic stays as it is until the next boot, then starts unmuted. After reset, power-cycle (or press reset) so the device reopens setup AP mode and WiFi can be configured again; the servo, screen, and LED steps are pre-filled with the saved values and can be retuned. Until reboot, credentials are cleared in NVS but the radio may still be on the previous STA network. No body. Requires Bearer when auth is enabled. Same JSON shape as `GET /settings`.
+Factory reset: clears the NVS `te` namespace and restores settings to compile-time defaults and clears every saved WiFi network. **Servo min/max, RGB LED mapping (`rgb_order`), OLED rotation (`oled_rotate_180`), and the mute input mode (`mute_switch`) are kept.** Internal last-pose blob (`spose`) is cleared/reset with defaults. The Chip settings (`brain_host`, `brain_port`, `bump_threshold_ma`, `mic_shift`) return to their defaults, and the saved mic mute (`mic_mute`) is cleared: the mic stays as it is until the next boot, then starts unmuted. After reset, power-cycle (or press reset) so the device reopens setup AP mode and WiFi can be configured again; the servo, screen, and LED steps are pre-filled with the saved values and can be retuned. Until reboot, credentials are cleared in NVS but the radio may still be on the previous STA network. No body. Requires Bearer when auth is enabled. Same JSON shape as `GET /settings`.
 
 The Config web UI clears the browser-stored Bearer token and shows a one-shot gate: power-cycle the device, then join the robot WiFi shown on the OLED and open the setup wizard. It does not poll for reconnect.
 
@@ -281,6 +285,7 @@ curl -X POST "http://tiny-engineer.local/settings/reset"
   "brain_port": 47100,
   "bump_threshold_ma": 650,
   "mic_shift": 14,
+  "mute_switch": false,
   "wifi_networks": [],
   "reboot_required": true
 }
@@ -631,26 +636,27 @@ Errors arrive before any audio plays:
 
 ### `GET /mic`
 
-Mic state. Safe, no hardware side effects. Optional hardware: INMP441 I2S mic on GP6 and a mute button on GP7 ([pinout](hardware/pinout.md)). Without them the routes still answer (`present` stays `false`).
+Mic state. Safe, no hardware side effects. Optional hardware: INMP441 I2S mic on GP6 and a mute button or on/off switch on GP7 ([pinout](hardware/pinout.md)). Without them the routes still answer (`present` stays `false`).
 
 ```bash
 curl http://tiny-engineer.local/mic
 ```
 
 ```json
-{ "ok": true, "muted": false, "streaming": true, "present": true, "level": 0.042 }
+{ "ok": true, "muted": false, "streaming": true, "present": true, "level": 0.042, "mute_input": "button" }
 ```
 
 | Field | Meaning |
 | --- | --- |
-| `muted` | Mic muted. Saved in NVS (`mic_mute`), so it survives a reboot |
+| `muted` | Mic muted. Button mode: saved in NVS (`mic_mute`), so it survives a reboot. Switch mode: the switch position (open = muted) |
 | `streaming` | Audio packets are going out ([Mic stream](#mic-stream-udp)): not muted, Wi-Fi up, `brain_host` set and resolved, last send accepted |
 | `present` | Mic data seen (non-constant samples) since boot |
 | `level` | Recent RMS of the mic signal after `mic_shift`, `0`–`1` (three decimals); `0` while muted |
+| `mute_input` | `button` or `switch` (setting `mute_switch`) |
 
 ### `POST /mic`
 
-Mute or unmute. The momentary button on GP7 toggles the same state: its own task reads it every 5 ms (30 ms debounce), so a press is never lost to a busy loop, and the mic stream honours it on the very next packet. A `POST /mic` sets the state outright (presses before it are settled; presses after it toggle again). JSON body.
+Mute or unmute (button mode only). The momentary button on GP7 toggles the same state: its own task reads it every 5 ms (30 ms debounce), so a press is never lost to a busy loop, and the mic stream honours it on the very next packet. A `POST /mic` sets the state outright (presses before it are settled; presses after it toggle again). JSON body.
 
 | Field | Type | Range |
 | --- | --- | --- |
@@ -660,7 +666,9 @@ Mute or unmute. The momentary button on GP7 toggles the same state: its own task
 curl -X POST "http://tiny-engineer.local/mic" -H "Content-Type: application/json" -d '{"muted":true}'
 ```
 
-Reply: same JSON as `GET /mic`. Missing or non-boolean `muted` → **400** `invalid muted`.
+Reply: same JSON as `GET /mic`. Missing or non-boolean `muted` → **400** `invalid muted`. In switch mode (`mute_switch` = `true`) → **409** `mute follows the switch`, and nothing changes.
+
+**Switch mode** (`mute_switch` = `true`, for a maintained 2-pin on/off switch from GP7 to GND): the switch position is the mute state. Closed ("I") = listening, open ("O") = muted, so a broken or unplugged wire fails safe to muted. The same task reads it every 5 ms with a 30 ms debounce and the mic stream follows it on the next packet, even while another request is running. Nothing is written to NVS on a flip. After boot the mic counts as muted until the switch has read closed for 30 ms. Turning switch mode off keeps the mute the switch gave. Leave switch mode off when nothing is on GP7, or the robot stays muted.
 
 While muted the robot shows a mark: a crossed-out microphone in the top-right corner of the OLED eyes (every eye style), and the RGB LED glows **dim amber** wherever the animation would leave it off (`none`, `sleep`, `listening`; also visible while the OLED sleeps).
 
@@ -838,7 +846,7 @@ While muted: no audio, one heartbeat (`n = 0`, `muted` set) per second. The brai
 | `400` | `{"ok":false,"error":"..."}` | Bad body or fields on `/settings`, `/settings/wifi`, `/test/servo`, `/setup/*`, `/mic`, `/pose`, `/ranges` or `/ranges/explore`, or bad `/anim` or `/play` params (see tables above) |
 | `401` | `{"ok":false,"error":"unauthorized"}` | Access token configured and `Authorization: Bearer` missing or wrong |
 | `404` | `{"ok":false,"error":"not found"}` | Unknown path |
-| `409` | `{"ok":false,"error":"..."}` | `POST /ranges/explore` without a working INA219, or with an implausible holding current |
+| `409` | `{"ok":false,"error":"..."}` | `POST /ranges/explore` without a working INA219, or with an implausible holding current; `POST /mic` in switch mode (`mute follows the switch`) |
 | `415` | `{"ok":false,"error":"..."}` | `/play` body is not a supported WAV |
 | `500` | `{"ok":false,"error":"current sensor failed during explore"}` | `POST /ranges/explore` lost the current sensor mid-run |
 | `503` | `{"ok":false,"error":"busy"}` | `POST /pose` or `POST /ranges/explore` while a serial `/play` stream holds the robot |

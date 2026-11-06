@@ -25,5 +25,6 @@ constexpr const char* kKeyBrainHost = "brain_host";
 constexpr const char* kKeyBrainPort = "brain_port";
 constexpr const char* kKeyBumpMa = "bump_ma";
 constexpr const char* kKeyMicShift = "mic_shift";
+constexpr const char* kKeyMuteSwitch = "mute_sw";
 
 extern Preferences g_settingsPrefs;

@@ -105,6 +105,10 @@ void SettingsValues::load() {
   loadUInt(brainPort, kKeyBrainPort, settingsValidateBrainPort);
   loadUInt(bumpThresholdMa, kKeyBumpMa, settingsValidateBumpThreshold);
   loadUInt(micShift, kKeyMicShift, settingsValidateMicShift);
+
+  if (g_settingsPrefs.isKey(kKeyMuteSwitch)) {
+    muteSwitch = g_settingsPrefs.getBool(kKeyMuteSwitch, muteSwitch);
+  }
 }
 
 namespace {
@@ -155,6 +159,7 @@ bool writeValues(const SettingsValues& values, const SettingsValues& before, boo
   putUInt(kKeyBrainPort, values.brainPort, before.brainPort);
   putUInt(kKeyBumpMa, values.bumpThresholdMa, before.bumpThresholdMa);
   putUInt(kKeyMicShift, values.micShift, before.micShift);
+  putBool(kKeyMuteSwitch, values.muteSwitch, before.muteSwitch);
 
   if (all || memcmp(&values.servoRanges, &before.servoRanges, sizeof(ServoRanges)) != 0) {
     uint8_t blob[kServoRangesLen];
@@ -240,6 +245,7 @@ bool factoryResetSettings() {
   next.servoRanges = g_settings.servoRanges;
   strlcpy(next.rgbOrder, g_settings.rgbOrder, sizeof(next.rgbOrder));
   next.oledRotate180 = g_settings.oledRotate180;
+  next.muteSwitch = g_settings.muteSwitch;
 
   if (!next.replaceAll()) {
     serialLogPrintln("Settings: factory reset failed");

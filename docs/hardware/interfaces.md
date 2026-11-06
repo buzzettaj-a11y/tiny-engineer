@@ -97,7 +97,12 @@ C3-Zero has **no** USB–UART bridge. If CDC does not enumerate, hold **BOOT (GP
 | UART0 | GPIO21 TX / GPIO20 RX | Silkscreen; console is USB CDC |
 | BLE | antenna | Hardware may be present; **out of scope** — product uses Wi-Fi only |
 
-## Mic mute button (optional)
+## Mic mute button or switch (optional)
 
-Momentary switch from **GP7** to **GND**. `INPUT_PULLUP`, active LOW, read every 5 ms by its own task with a 30 ms debounce; each press toggles mute (saved in NVS) and the mic stream honours it on the next packet. Nothing on GP7 = never muted by the button.
+Something from **GP7** to **GND**, `INPUT_PULLUP`, active LOW, read every 5 ms by its own task with a 30 ms debounce; the mic stream honours it on the next packet. Setting `mute_switch` says which:
+
+| Part | `mute_switch` | Behaviour |
+| --- | --- | --- |
+| Momentary push button | `false` (default) | Each press toggles mute (saved in NVS). Nothing on GP7 = never muted by the button |
+| Maintained 2-pin on/off (I/O rocker, SPST) switch | `true` | The position is the mute state: closed ("I") = listening, open ("O") = muted. A broken or unplugged wire reads open, so it fails safe to muted ([ADR 0004](../adr/0004-mute-switch-open-means-muted.md)). Do not enable it with nothing on GP7 |
 | ESP32 onboard USB-C | — | Unused when the board USB-C supplies power + data |

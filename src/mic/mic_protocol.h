@@ -91,7 +91,18 @@ bool micStateMuted(uint32_t state);
 uint32_t micStateApplied(uint32_t state);
 bool micEffectiveMuted(uint32_t state, uint32_t presses);
 
-// Debounced momentary button. update() returns true once per press.
+// Mute input mode (setting `mute_switch`, docs/adr/0004):
+//  button (false): momentary button, each press toggles; state + presses as above.
+//  switch (true):  maintained switch, its debounced level IS the mute state:
+//                  closed to GND = listening, open (or a broken wire) = muted.
+bool micEffectiveMutedMode(bool switchMode, bool switchClosed, uint32_t state, uint32_t presses);
+
+// Button-mode state to adopt when switch mode is turned off: keeps the mute the
+// switch gave (open = muted) and settles every press counted so far.
+uint32_t micStateLeavingSwitch(bool switchClosed, uint32_t presses);
+
+// Debounced momentary button or maintained switch. update() returns true once
+// per press (closing); pressed() is the debounced level (true = closed).
 class MicButton {
 public:
   bool update(bool rawPressed, uint32_t nowMs);

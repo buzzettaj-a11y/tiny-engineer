@@ -24,7 +24,7 @@ and the brain (`chip/brain/`). Change both sides together.
 | | SD (mic data out) | **GP6** | I2S data in |
 | | L/R | GND | mic on the **left** slot |
 | | VDD / GND | 3V3 / GND | never 5 V |
-| Mute button (momentary, to GND) | — | **GP7** | `INPUT_PULLUP`, active low |
+| Mute button (momentary) **or** on/off switch (maintained), to GND | — | **GP7** | `INPUT_PULLUP`, active low; setting `mute_switch` picks which (see §4) |
 | INA219 current sensor | SDA / SCL | GP0 / GP1 | same I2C bus as PCA9685 + OLED |
 | | address | **0x41** | A0 jumper bridged (PCA9685 owns 0x40) |
 | | VIN+ → VIN− | in series with the 5 V lead to the PCA9685 **V+** screw terminal | measures total servo current |
@@ -32,7 +32,8 @@ and the brain (`chip/brain/`). Change both sides together.
 All three parts are optional at runtime: firmware must boot and behave exactly
 like stock when a part is missing (no mic → stream silence or don't stream; no
 INA219 at 0x41 → bump detection off, `current_ma` null; nothing on GP7 → never
-muted by button).
+muted by button, as long as `mute_switch` stays off; in switch mode an open GP7
+means muted, by design).
 
 ## 2. Audio bus change
 
@@ -71,9 +72,13 @@ All JSON, same auth rules as today (`Access::Configured` unless noted). Every
 route goes into `kRoutes`, `docs/api.md`, `ui/src/views/ApiReference.tsx`.
 
 ### `GET /mic` / `POST /mic`
-`{"muted": bool}` in, `{"ok":true,"muted":bool,"streaming":bool,"present":bool,"level":0..1}` out.
+`{"muted": bool}` in, `{"ok":true,"muted":bool,"streaming":bool,"present":bool,"level":0..1,"mute_input":"button"|"switch"}` out.
 `present` = mic data seen (non-constant samples) since boot. `level` = recent RMS
-(0..1). Mute state persists in NVS. The GP7 button toggles the same state.
+(0..1). Button mode (`mute_switch` false, default): mute persists in NVS and each
+GP7 press toggles it. Switch mode (`mute_switch` true, docs/adr/0004): the GP7
+switch level **is** the mute state, closed = listening, open (or a broken wire)
+= muted, debounced 30 ms and followed by the stream on the next packet; POST
+answers 409 `mute follows the switch` and changes nothing.
 Muted shows a visible indicator on the robot (OLED mark if feasible, otherwise
 the RGB LED: dim amber when the animation would leave the LED off).
 
@@ -148,6 +153,7 @@ Empties the bump list and resets soft limits to saved. `{"ok":true}`.
 | `brain_port` | int 1–65535 | 47100 | UDP port |
 | `bump_threshold_ma` | int 0–3000 | 650 | 0 disables the reflex |
 | `mic_shift` | int 8–20 | 14 | 16-bit sample = saturate(int32 slot >> `mic_shift`); lower = louder (6 dB per step) |
+| `mute_switch` | bool | false | GP7 is a maintained on/off switch (open = muted) instead of a momentary toggle button. Kept by factory reset |
 
 ### `GET /health` additions
 `"mic":{"present":bool,"muted":bool,"streaming":bool}`,

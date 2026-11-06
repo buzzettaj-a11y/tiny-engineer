@@ -237,6 +237,16 @@ export function ApiReference() {
               default <code>14</code>
             </td>
           </tr>
+          <tr>
+            <td>
+              <code>mute_switch</code>
+            </td>
+            <td>boolean</td>
+            <td>
+              <code>false</code> = GP7 mute button (each press toggles), <code>true</code> = GP7
+              on/off switch (open = muted); default <code>false</code>
+            </td>
+          </tr>
         </tbody>
       </table>
       <p>
@@ -400,7 +410,8 @@ export function ApiReference() {
         </tbody>
       </table>
       <p>
-        POST <code>/mic</code> &mdash; JSON body fields. The GP7 button toggles the same state:
+        POST <code>/mic</code> &mdash; JSON body fields. The GP7 button toggles the same state; with{" "}
+        <code>mute_switch</code> on, the switch decides and this answers 409:
       </p>
       <table>
         <thead>

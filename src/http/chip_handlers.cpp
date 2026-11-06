@@ -43,6 +43,7 @@ void sendMicStatus(WebServer& server) {
   body["streaming"] = status.streaming;
   body["present"] = status.present;
   body["level"] = roundf(status.level * 1000.0f) / 1000.0f;
+  body["mute_input"] = status.switchMode ? "switch" : "button";
   sendJson(server, 200, body);
 }
 
@@ -139,7 +140,11 @@ void handleMicPost(WebServer& server) {
     return;
   }
 
-  micSetMuted(muted.as<bool>());
+  if (!micSetMuted(muted.as<bool>())) {
+    sendError(server, 409, "mute follows the switch");
+    return;
+  }
+
   sendMicStatus(server);
 }
 

@@ -33,6 +33,7 @@ SettingsValues SettingsValues::defaults() {
   values.brainPort = SETTINGS_DEFAULT_BRAIN_PORT;
   values.bumpThresholdMa = SETTINGS_DEFAULT_BUMP_THRESHOLD_MA;
   values.micShift = SETTINGS_DEFAULT_MIC_SHIFT;
+  values.muteSwitch = SETTINGS_DEFAULT_MUTE_SWITCH;
   return values;
 }
 
@@ -47,6 +48,7 @@ void SettingsValues::apply(const SettingsPatch& patch) {
   brainPort = patch.brainPort.value_or(brainPort);
   bumpThresholdMa = patch.bumpThresholdMa.value_or(bumpThresholdMa);
   micShift = patch.micShift.value_or(micShift);
+  muteSwitch = patch.muteSwitch.value_or(muteSwitch);
 
   if (patch.hostname != nullptr) {
     strlcpy(hostname, patch.hostname, sizeof(hostname));
@@ -90,7 +92,7 @@ void SettingsValues::log(const char* prefix) const {
     "%s sleep_timeout=%umin hostname=%s volume=%u welcome=%s serial_log=on "
     "continuous_timeout=%umin loading=%s eyes_style=%s access_token=%s "
     "link_mode=%s wifi_networks=%u servos=%u-%u;%u-%u;%u-%u;%u-%u;%u-%u rgb_order=%s "
-    "oled_rotate_180=%s brain_host=%s brain_port=%u bump_threshold_ma=%u mic_shift=%u",
+    "oled_rotate_180=%s brain_host=%s brain_port=%u bump_threshold_ma=%u mic_shift=%u mute_switch=%s",
     prefix,
     static_cast<unsigned>(sleepTimeoutMin),
     hostname,
@@ -109,7 +111,8 @@ void SettingsValues::log(const char* prefix) const {
     brainHost[0] != '\0' ? brainHost : "(none)",
     static_cast<unsigned>(brainPort),
     static_cast<unsigned>(bumpThresholdMa),
-    static_cast<unsigned>(micShift)
+    static_cast<unsigned>(micShift),
+    muteSwitch ? "on" : "off"
   );
   serialLogPrintln(line);
 }

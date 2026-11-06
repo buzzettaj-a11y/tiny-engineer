@@ -12,7 +12,7 @@ Source of truth: [`include/pins.h`](../../include/pins.h). This file must match 
 | I2S LRCLK / WS | **GPIO3** (diagram **GP3**) | `I2S_LRC` | MAX98357A **LRC**; optional INMP441 **WS** (shared) |
 | I2S DATA OUT | **GPIO4** (diagram **GP4**) | `I2S_DIN` | MAX98357A DIN |
 | I2S DATA IN (optional) | **GPIO6** (diagram **GP6**) | `I2S_MIC_SD` | INMP441 **SD** (L/R tied to GND: left slot). Internal pull-down enabled |
-| Mic mute button (optional) | **GPIO7** (diagram **GP7**) | `MIC_MUTE_BUTTON_PIN` | Momentary switch to GND; `INPUT_PULLUP`, active LOW |
+| Mic mute button or switch (optional) | **GPIO7** (diagram **GP7**) | `MIC_MUTE_BUTTON_PIN` | Momentary button, or maintained on/off switch (setting `mute_switch`), to GND; `INPUT_PULLUP`, active LOW |
 | PCA9685 OE | **GPIO5** (diagram **GP5**) | `PCA9685_OE_PIN` | PCA9685 **OE** (active LOW; `PCA9685_OE_WIRED`) |
 | Built-in WS2812 RGB | **GPIO10** | `RGB_LED_PIN` | onboard LED only |
 
@@ -75,7 +75,7 @@ Same bus as J2 / PCA9685. **Pin order is not the same as J2** (GND and 3.3 V are
 | 7 | **+3.3V** |
 | 8 | **GP8** (strapping — do not pull low at reset) |
 | 9 | **I2S BCLK** |
-| 10 | **GP7** (optional mic mute button) |
+| 10 | **GP7** (optional mic mute button or switch) |
 | 11 | **I2S LRC** |
 | 12 | **GP6** (optional INMP441 SD) |
 

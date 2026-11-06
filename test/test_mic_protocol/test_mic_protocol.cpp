@@ -312,6 +312,92 @@ void test_mute_state_counter_wrap() {
   TEST_ASSERT_TRUE(micEffectiveMuted(state, applied + 2u));
 }
 
+// Switch mode (docs/adr/0004): GP7 level is the mute state.
+void test_switch_closed_is_listening_open_is_muted() {
+  const uint32_t state = micPackMuteState(0, true);  // button-mode state is ignored
+  TEST_ASSERT_FALSE(micEffectiveMutedMode(true, true, state, 0));
+  TEST_ASSERT_TRUE(micEffectiveMutedMode(true, false, state, 0));
+  // Pending presses (switch closures) do not toggle anything in switch mode.
+  TEST_ASSERT_FALSE(micEffectiveMutedMode(true, true, state, 7));
+  TEST_ASSERT_TRUE(micEffectiveMutedMode(true, false, micPackMuteState(0, false), 3));
+}
+
+void test_button_mode_unchanged_by_switch_level() {
+  uint32_t presses = 0;
+  const uint32_t state = micPackMuteState(presses, false);
+  TEST_ASSERT_FALSE(micEffectiveMutedMode(false, false, state, presses));
+  TEST_ASSERT_FALSE(micEffectiveMutedMode(false, true, state, presses));
+  TEST_ASSERT_TRUE(micEffectiveMutedMode(false, true, state, presses + 1));
+  TEST_ASSERT_EQUAL(micEffectiveMuted(state, presses + 1),
+                    micEffectiveMutedMode(false, false, state, presses + 1));
+}
+
+void test_switch_level_debounce() {
+  // The debounced level (MicButton::pressed) is the switch: closed = pressed.
+  MicButton sw;
+  uint32_t t = 0;
+  // Boot: open (pulled up). Starts "not closed" = muted, fail-safe.
+  for (; t < 100; t += 5) {
+    sw.update(false, t);
+  }
+  TEST_ASSERT_FALSE(sw.pressed());
+
+  // Flip to I with contact bounce shorter than the debounce: ignored until stable.
+  sw.update(true, 100);
+  sw.update(false, 110);
+  sw.update(true, 115);
+  TEST_ASSERT_FALSE(sw.pressed());
+  for (t = 120; t < 200; t += 5) {
+    sw.update(true, t);
+  }
+  TEST_ASSERT_TRUE(sw.pressed());
+
+  // A 20 ms glitch open is ignored: still listening.
+  for (t = 200; t < 220; t += 5) {
+    sw.update(false, t);
+  }
+  sw.update(true, 220);
+  for (t = 225; t < 300; t += 5) {
+    sw.update(true, t);
+  }
+  TEST_ASSERT_TRUE(sw.pressed());
+
+  // Flip to O: muted once stable for the debounce time.
+  for (t = 300; t < 300 + kMicButtonDebounceMs - 5; t += 5) {
+    sw.update(false, t);
+  }
+  TEST_ASSERT_TRUE(sw.pressed());
+  for (; t < 400; t += 5) {
+    sw.update(false, t);
+  }
+  TEST_ASSERT_FALSE(sw.pressed());
+}
+
+void test_switching_modes_at_runtime() {
+  // Button mode, unmuted, two presses counted and applied.
+  uint32_t presses = 2;
+  uint32_t state = micPackMuteState(presses, false);
+  TEST_ASSERT_FALSE(micEffectiveMutedMode(false, true, state, presses));
+
+  // Switch mode on: the level rules at once.
+  TEST_ASSERT_TRUE(micEffectiveMutedMode(true, false, state, presses));
+  // Flips while in switch mode count as presses; they must not leak later.
+  presses += 5;
+  TEST_ASSERT_TRUE(micEffectiveMutedMode(true, false, state, presses));
+
+  // Switch mode off with the switch at O: button mode carries on muted, with
+  // every press so far settled.
+  state = micStateLeavingSwitch(false, presses);
+  TEST_ASSERT_TRUE(micEffectiveMutedMode(false, false, state, presses));
+  TEST_ASSERT_EQUAL_UINT32(presses & 0x7FFFFFFFu, micStateApplied(state));
+  // The next press toggles as usual.
+  TEST_ASSERT_FALSE(micEffectiveMutedMode(false, true, state, presses + 1));
+
+  // Leaving switch mode at I carries on listening.
+  state = micStateLeavingSwitch(true, presses);
+  TEST_ASSERT_FALSE(micEffectiveMutedMode(false, true, state, presses));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_packet_constants_match_protocol);
@@ -333,5 +419,9 @@ int main() {
   RUN_TEST(test_mute_state_pending_presses_toggle);
   RUN_TEST(test_mute_state_explicit_set_settles_presses);
   RUN_TEST(test_mute_state_counter_wrap);
+  RUN_TEST(test_switch_closed_is_listening_open_is_muted);
+  RUN_TEST(test_button_mode_unchanged_by_switch_level);
+  RUN_TEST(test_switch_level_debounce);
+  RUN_TEST(test_switching_modes_at_runtime);
   return UNITY_END();
 }

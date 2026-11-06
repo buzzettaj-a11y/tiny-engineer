@@ -63,6 +63,8 @@ uint32_t g_hostGeneration = 0;
 // Cross-task state: plain atomic loads/stores only. The ESP32-C3 (RV32IMC) has
 // no atomic read-modify-write instructions, so every value has one writer.
 std::atomic<uint32_t> g_buttonPresses{0};  // button reader only
+std::atomic<bool> g_switchClosed{false};   // button reader only: debounced GP7 level
+std::atomic<bool> g_switchMode{false};     // loop task only (setting mute_switch)
 std::atomic<uint32_t> g_muteState{0};      // loop task only (micPackMuteState)
 std::atomic<uint8_t> g_shift{SETTINGS_DEFAULT_MIC_SHIFT};  // loop task only
 std::atomic<uint16_t> g_destPort{0};       // DNS task only
@@ -88,8 +90,12 @@ void bump(std::atomic<uint32_t>& counter) {
   counter.store(counter.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
 }
 
+// Mode-aware (docs/adr/0004): in switch mode the debounced GP7 level is the
+// mute (open = muted); otherwise the saved state plus pending button presses.
 bool effectiveMuted() {
-  return micEffectiveMuted(
+  return micEffectiveMutedMode(
+    g_switchMode.load(std::memory_order_acquire),
+    g_switchClosed.load(std::memory_order_acquire),
     g_muteState.load(std::memory_order_acquire),
     g_buttonPresses.load(std::memory_order_acquire)
   );
@@ -169,6 +175,10 @@ void buttonTask(void* /*arg*/) {
         std::memory_order_release
       );
     }
+
+    // Switch mode reads the level itself; the mic task follows it on its next
+    // packet even while loop() is blocked.
+    g_switchClosed.store(button.pressed(), std::memory_order_release);
 
     vTaskDelay(pdMS_TO_TICKS(kButtonPollMs));
   }
@@ -324,12 +334,46 @@ void micTask(void* /*arg*/) {
   }
 }
 
+// Loop task: follows the mute_switch setting. Leaving switch mode keeps the
+// mute the switch gave and settles the flips counted meanwhile.
+void syncMuteMode() {
+  const bool want = settingsMuteSwitch();
+
+  if (want == g_switchMode.load(std::memory_order_relaxed)) {
+    return;
+  }
+
+  const uint32_t presses = g_buttonPresses.load(std::memory_order_acquire);
+
+  if (want) {
+    // Settle presses now so none are pending when switch mode ends.
+    const uint32_t state = g_muteState.load(std::memory_order_relaxed);
+    g_muteState.store(micPackMuteState(presses, micStateMuted(state)), std::memory_order_release);
+    g_switchMode.store(true, std::memory_order_release);
+  } else {
+    const uint32_t state =
+      micStateLeavingSwitch(g_switchClosed.load(std::memory_order_acquire), presses);
+    g_muteState.store(state, std::memory_order_release);
+    g_switchMode.store(false, std::memory_order_release);
+    saveMuted(micStateMuted(state));
+  }
+
+  serialLogPrint("[mic] mute input: ");
+  serialLogPrintln(want ? "switch (GP7 open = muted)" : "button");
+}
+
 // Loop task: folds counted presses into the saved state.
 void applyButtonPresses() {
   const uint32_t presses = g_buttonPresses.load(std::memory_order_acquire);
   const uint32_t state = g_muteState.load(std::memory_order_relaxed);
 
   if ((presses & 0x7FFFFFFFu) == micStateApplied(state)) {
+    return;
+  }
+
+  if (g_switchMode.load(std::memory_order_relaxed)) {
+    // Switch flips are not toggles: settle them, and do not wear NVS.
+    g_muteState.store(micPackMuteState(presses, micStateMuted(state)), std::memory_order_release);
     return;
   }
 
@@ -392,14 +436,19 @@ void initMic() {
 
   const bool muted = loadMuted();
   g_muteState.store(micPackMuteState(0, muted), std::memory_order_release);
+  // Switch mode starts muted (switch not yet seen closed) until the button task
+  // has 30 ms of a closed level: fail-safe.
+  g_switchMode.store(settingsMuteSwitch(), std::memory_order_release);
   // Set apart from the state so the first micTick() paints a muted indicator.
   g_indicatorMuted = false;
 
   g_hostLock = xSemaphoreCreateMutex();
   syncConfig();
 
+  serialLogPrint("[mic] mute input: ");
+  serialLogPrintln(settingsMuteSwitch() ? "switch (GP7 open = muted)" : "button");
   serialLogPrint("[mic] muted=");
-  serialLogPrintln(muted ? "yes" : "no");
+  serialLogPrintln(settingsMuteSwitch() ? "follows the switch" : (muted ? "yes" : "no"));
 
   // The button works with or without a mic.
   if (xTaskCreate(buttonTask, "micbtn", kButtonStackBytes, nullptr, kButtonPriority, &g_buttonTask) !=
@@ -434,9 +483,14 @@ void initMic() {
 void micTick(uint32_t nowMs) {
   syncConfig();
 
+  syncMuteMode();
+
   // Without the button task the button is read here (loop rate).
-  if (g_buttonTask == nullptr && g_loopButton.update(buttonRawPressed(), nowMs)) {
-    bump(g_buttonPresses);
+  if (g_buttonTask == nullptr) {
+    if (g_loopButton.update(buttonRawPressed(), nowMs)) {
+      bump(g_buttonPresses);
+    }
+    g_switchClosed.store(g_loopButton.pressed(), std::memory_order_release);
   }
 
   applyButtonPresses();
@@ -448,7 +502,17 @@ bool micMuted() {
   return effectiveMuted();
 }
 
-void micSetMuted(bool muted) {
+bool micMuteFollowsSwitch() {
+  syncMuteMode();
+  return g_switchMode.load(std::memory_order_relaxed);
+}
+
+bool micSetMuted(bool muted) {
+  // In switch mode the switch is the only authority.
+  if (micMuteFollowsSwitch()) {
+    return false;
+  }
+
   // An explicit set also settles any presses counted so far.
   const uint32_t presses = g_buttonPresses.load(std::memory_order_acquire);
   g_muteState.store(micPackMuteState(presses, muted), std::memory_order_release);
@@ -456,11 +520,13 @@ void micSetMuted(bool muted) {
   serialLogPrint("[mic] muted=");
   serialLogPrintln(muted ? "yes" : "no");
   refreshIndicator(millis());
+  return true;
 }
 
 MicStatus micStatus() {
   MicStatus status{};
   status.muted = effectiveMuted();
+  status.switchMode = g_switchMode.load(std::memory_order_relaxed);
   status.streaming = !status.muted && g_streaming.load(std::memory_order_relaxed);
   status.present = g_present.load(std::memory_order_relaxed);
   status.level = status.muted ? 0.0f : g_levelPermille.load(std::memory_order_relaxed) / 1000.0f;

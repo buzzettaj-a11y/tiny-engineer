@@ -85,6 +85,7 @@ String readPatch(JsonObjectConst body, SettingsPatch& patch) {
   read("brain_port", patch.brainPort);
   read("bump_threshold_ma", patch.bumpThresholdMa);
   read("mic_shift", patch.micShift);
+  read("mute_switch", patch.muteSwitch);
 
   ServoRanges ranges{};
   read("servo_mins", ranges.mins);
@@ -145,6 +146,7 @@ JsonDocument settingsJson() {
   doc["brain_port"] = settingsBrainPort();
   doc["bump_threshold_ma"] = settingsBumpThresholdMa();
   doc["mic_shift"] = settingsMicShift();
+  doc["mute_switch"] = settingsMuteSwitch();
 
   const WifiNetworkList& networks = settingsWifiNetworks();
   JsonArray ssids = doc["wifi_networks"].to<JsonArray>();

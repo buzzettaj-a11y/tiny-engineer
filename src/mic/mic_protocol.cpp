@@ -147,6 +147,17 @@ bool micEffectiveMuted(uint32_t state, uint32_t presses) {
   return micStateMuted(state) != (pending != 0);
 }
 
+bool micEffectiveMutedMode(bool switchMode, bool switchClosed, uint32_t state, uint32_t presses) {
+  if (switchMode) {
+    return !switchClosed;
+  }
+  return micEffectiveMuted(state, presses);
+}
+
+uint32_t micStateLeavingSwitch(bool switchClosed, uint32_t presses) {
+  return micPackMuteState(presses, !switchClosed);
+}
+
 void MicPresence::feed(const int32_t* stereo, size_t frames) {
   if (present() || frames < 2) {
     return;

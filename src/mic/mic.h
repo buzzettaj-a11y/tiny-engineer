@@ -20,11 +20,15 @@ void initMic();
 void micTick(uint32_t nowMs);
 
 bool micMuted();
-// Saves to NVS and updates the indicator. Loop task only.
-void micSetMuted(bool muted);
+// Setting mute_switch: the GP7 switch level is the mute state (docs/adr/0004).
+bool micMuteFollowsSwitch();
+// Saves to NVS and updates the indicator. Loop task only. False (nothing
+// changed) in switch mode, where the switch is the only authority.
+bool micSetMuted(bool muted);
 
 struct MicStatus {
   bool muted;
+  bool switchMode;  // mute_input "switch" (else "button")
   bool streaming;
   bool present;
   float level;  // 0..1, 0 while muted

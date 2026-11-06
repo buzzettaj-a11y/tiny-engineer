@@ -46,6 +46,9 @@ constexpr uint16_t SETTINGS_BUMP_THRESHOLD_MAX_MA = 3000;
 constexpr uint8_t SETTINGS_DEFAULT_MIC_SHIFT = 14;
 constexpr uint8_t SETTINGS_MIC_SHIFT_MIN = 8;
 constexpr uint8_t SETTINGS_MIC_SHIFT_MAX = 20;
+// Mute input on GP7: false = momentary button (each press toggles), true =
+// maintained switch whose level is the mute state (open = muted). docs/adr/0004.
+constexpr bool SETTINGS_DEFAULT_MUTE_SWITCH = false;
 
 struct ServoRanges {
   uint8_t mins[SETTINGS_SERVO_COUNT];
@@ -74,6 +77,7 @@ struct SettingsPatch {
   std::optional<uint16_t> brainPort;
   std::optional<uint16_t> bumpThresholdMa;
   std::optional<uint8_t> micShift;
+  std::optional<bool> muteSwitch;
 
   // API name of the first field set to an invalid value, or nullptr.
   const char* invalidField() const;
@@ -118,6 +122,7 @@ const char* settingsBrainHost();
 uint16_t settingsBrainPort();
 uint16_t settingsBumpThresholdMa();
 uint8_t settingsMicShift();
+bool settingsMuteSwitch();
 
 // True once the saved hostname, loading screen or WiFi networks differ from
 // what this boot started with; those apply only after a reboot.
@@ -147,5 +152,6 @@ bool saveSettings(const SettingsPatch& patch);
 bool saveWifiNetworks(const WifiNetworkList& networks);
 
 // Clears the NVS namespace and restores the defaults, WiFi networks included,
-// but keeps the servo min/max, RGB LED byte order and OLED 180° rotation.
+// but keeps the servo min/max, RGB LED byte order, OLED 180° rotation and the
+// mute input mode (they describe the hardware).
 bool factoryResetSettings();

@@ -62,6 +62,7 @@ class FakeRobot:
         self.animation = "none"
         self.busy_next = 0  # answer this many requests with 503 busy first
         self.muted = False
+        self.mute_switch = False  # firmware switch mode: POST /mic refused (ADR 0004)
         self.settings: dict = {}
         self.sensor = sensor
         self.saved_mins = [20, 30, 10, 100, 40]
@@ -191,8 +192,11 @@ class FakeRobot:
             return 200, {"ok": True}
         if p == "/mic":
             if method == "POST":
+                if self.mute_switch:
+                    return 409, {"ok": False, "error": "mute follows the switch"}
                 self.muted = bool(data["muted"])
-            return 200, {"ok": True, "muted": self.muted, "streaming": not self.muted, "present": True, "level": 0.01}
+            return 200, {"ok": True, "muted": self.muted, "streaming": not self.muted, "present": True, "level": 0.01,
+                         "mute_input": "switch" if self.mute_switch else "button"}
         if p == "/health":
             return 200, {"ok": True, "version": "fake", "mic": {"present": True, "muted": self.muted,
                                                                 "streaming": True}, "current_ma": 100.0, "bumps": 0}

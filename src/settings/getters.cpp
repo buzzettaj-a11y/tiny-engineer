@@ -106,3 +106,7 @@ uint16_t settingsBumpThresholdMa() {
 uint8_t settingsMicShift() {
   return g_settings.micShift;
 }
+
+bool settingsMuteSwitch() {
+  return g_settings.muteSwitch;
+}

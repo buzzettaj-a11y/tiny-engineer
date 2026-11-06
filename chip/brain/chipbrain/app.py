@@ -484,6 +484,9 @@ class Brain:
             try:
                 r = await self.robot.post("/mic", {"muted": muted})
             except RobotError as e:
+                if e.status == 409 and "switch" in str(e):
+                    return ("Joe's mute switch on the robot controls the mic. "
+                            "Tell him to flip it to O to mute, or to I to listen.")
                 return f"Could not change the mic: {e}"
             return f"Mic {'muted' if r.get('muted', muted) else 'unmuted'}."
         if name == "find_ranges":

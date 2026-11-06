@@ -26,7 +26,7 @@ Stock flash: **[Web flash](https://jamro.github.io/tiny-engineer/flash/)**. Buil
 | INA219 (optional) | Probe `0x41`, configure (PGA /8, 0.1 Ω shunt, ~3.2 A); absent = bump reflex off |
 | Wi-Fi | STA connect from saved NVS credentials, or setup AP `TinyEngineer-XXXX` when unset/failed; mDNS `{hostname}.local` after STA connect |
 | MAX98357A / I2S | `I2S.begin` 22.05 kHz, 32-bit stereo slots, full duplex (TX GP4 to the amp, RX GP6 from the optional INMP441 mic); speaker samples sit in the top 16 bits of each slot |
-| Mic (optional) | Mute state from NVS, GP7 button (`INPUT_PULLUP`), mic stream task; streams only with Wi-Fi and `brain_host` set |
+| Mic (optional) | Mute state from NVS (or the GP7 switch level when `mute_switch` is on), GP7 button/switch (`INPUT_PULLUP`), mic stream task; streams only with Wi-Fi and `brain_host` set |
 | Servos | Smooth move to mid (or sleep pose) at 35°/s |
 | HTTP | Port 80 when STA connected, or on setup AP at `192.168.4.1` |
 | Success | Dim green RGB during init; then animation LED (see below) |
@@ -119,7 +119,7 @@ curl -X POST "http://tiny-engineer.local/test/servo" -H "Content-Type: applicati
 | `GET` / `POST` | `/ranges` | Saved / soft / hard servo limits, current and bump log / save calibration outside setup `{"servo_mins","servo_maxs"}` — [api.md](../api.md#get-ranges) |
 | `POST` | `/ranges/explore` `{"joint","dir","speed"}` | Blocking probe (≤ ~14 s) of one joint toward its hard cap, at most 30° past the saved limit, until a bump; needs a working INA219 (`409` without) — [api.md](../api.md#post-rangesexplore) |
 | `POST` | `/bumps/clear` | Empty the bump log, soft limits back to saved |
-| `GET` | `/settings` | Persistent settings (`sleep_timeout`, `hostname`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `loading`, `eyes_style`, `access_token_set`, `wifi_configured`, `servo_mins`, `servo_maxs`, `rgb_order`, `oled_rotate_180`, `brain_host`, `brain_port`, `bump_threshold_ma`, `mic_shift`, `wifi_networks`) |
+| `GET` | `/settings` | Persistent settings (`sleep_timeout`, `hostname`, `volume`, `welcome`, `serial_log`, `continuous_timeout`, `loading`, `eyes_style`, `access_token_set`, `wifi_configured`, `servo_mins`, `servo_maxs`, `rgb_order`, `oled_rotate_180`, `brain_host`, `brain_port`, `bump_threshold_ma`, `mic_shift`, `mute_switch`, `wifi_networks`) |
 | `POST` | `/settings` | Update NVS settings from a JSON object; the reply carries `reboot_required`, true once `hostname`, `loading` or the WiFi networks differ from what the robot booted with. `servo_mins` / `servo_maxs` (integer arrays), `rgb_order` and `oled_rotate_180` (boolean) are setup-AP-only |
 | `PUT` | `/settings/wifi` | Replace the saved WiFi networks (JSON array of 1 to 5); first one tested in setup AP mode |
 | `POST` | `/settings/reset` | Factory reset settings to defaults (clears WiFi, keeps servo ranges, RGB mapping, and screen rotation); power-cycle to reopen setup AP |

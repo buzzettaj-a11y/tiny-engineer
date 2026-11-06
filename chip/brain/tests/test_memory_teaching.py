@@ -85,3 +85,21 @@ def test_memory_has_a_size_limit_and_ignores_duplicates(robot, tmp_path):
         assert "Nothing" in await brain.run_tool("forget", {"about": "zebra"})
 
     asyncio.run(go())
+
+
+def test_mute_request_with_a_mute_switch_tells_joe_to_flip_it(robot, tmp_path):
+    robot.mute_switch = True
+    brain = Brain(make_cfg(robot, tmp_path), transcriber=FakeTranscriber(lambda s, i: ""), tts=FakeTTS(),
+                  llm=None, wake_detector=None)
+
+    async def go():
+        await brain.start(udp=False)
+        try:
+            return await brain.run_tool("mute_mic", {"muted": True})
+        finally:
+            await brain.stop()
+
+    out = asyncio.run(go())
+    assert "flip it to O" in out
+    assert "could not" not in out.lower()
+    assert robot.muted is False

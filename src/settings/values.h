@@ -26,6 +26,7 @@ struct SettingsValues {
   uint16_t brainPort;
   uint16_t bumpThresholdMa;
   uint8_t micShift;
+  bool muteSwitch;
 
   static SettingsValues defaults();
 

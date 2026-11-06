@@ -269,6 +269,18 @@ void test_patch_names_chip_fields() {
   TEST_ASSERT_EQUAL_STRING("mic_shift", shift.invalidField());
 }
 
+void test_mute_switch_field() {
+  TEST_ASSERT_FALSE(SETTINGS_DEFAULT_MUTE_SWITCH);
+  SettingsPatch on;
+  on.muteSwitch = true;
+  TEST_ASSERT_NULL(on.invalidField());
+  // Not a setup-AP-only field: POST /settings applies it any time.
+  TEST_ASSERT_NULL(on.setupOnlyStep());
+  SettingsPatch off;
+  off.muteSwitch = false;
+  TEST_ASSERT_NULL(off.invalidField());
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_brain_host);
@@ -276,6 +288,7 @@ int main() {
   RUN_TEST(test_bump_threshold);
   RUN_TEST(test_mic_shift);
   RUN_TEST(test_patch_names_chip_fields);
+  RUN_TEST(test_mute_switch_field);
   RUN_TEST(test_hostname_rejects_invalid);
   RUN_TEST(test_hostname_accepts_valid);
   RUN_TEST(test_sleep_timeout);
