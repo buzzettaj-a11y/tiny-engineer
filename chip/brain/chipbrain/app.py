@@ -18,12 +18,14 @@ import numpy as np
 from . import __version__
 from .animmap import CONTINUOUS, animation_for_event
 from .audio import ROBOT_RATE, STT_RATE, StreamResampler, float_to_int16, int16_to_float
-from .claude import AnthropicBackend, ChipAgent, LLMBackend
+from .claude import AnthropicBackend, LLMBackend
 from .config import Config
 from .conversation import Conversation
 from .focus import FocusChange, FocusManager, HeadsUp, spoken
 from .httpserver import JsonHttpServer
 from .idle import IdleContext, IdlePersonality
+from .memory import Memory
+from .mind import Mind
 from .packets import PacketError, StreamStats, parse_packet
 from .rangecoach import RangeCoach, State
 from .robot import RobotClient, RobotError, Transport
@@ -72,6 +74,7 @@ class Brain:
         transcriber: Transcriber | None = None,
         tts: TTSBackend | None = None,
         llm: Any = AUTO,
+        local_llm: Any = AUTO,
         wake_detector: Any = AUTO,
         clock=time.monotonic,
         idle: IdlePersonality | None = None,
@@ -93,8 +96,10 @@ class Brain:
         self.stt = transcriber or make_transcriber(cfg.stt)
         self.tts = tts or make_tts(cfg.tts, cfg.resolve)
         self.llm: LLMBackend | None = self._make_llm() if llm is AUTO else llm
-        self.agent = ChipAgent(cfg.claude, self.llm, self.run_tool)
+        self.local_llm: LLMBackend | None = self._make_local() if local_llm is AUTO else local_llm
+        self.mind = Mind(cfg.local, cfg.claude, self.local_llm, self.llm, self.run_tool)
         self.state = State(cfg.resolve(cfg.brain.state_file))
+        self.memory = Memory(cfg.resolve(cfg.brain.memory_file), cfg.brain.memory_max_items)
         self.stt_pool = ThreadPoolExecutor(1, thread_name_prefix="stt")
         self.tts_pool = ThreadPoolExecutor(1, thread_name_prefix="tts")
         self.speaker = Speaker(self.tts, self.robot, self.tts_pool)
@@ -125,6 +130,14 @@ class Brain:
         except ImportError:
             log.warning("anthropic package missing (pip install anthropic): Chip can hear but not think")
             return None
+
+    def _make_local(self) -> LLMBackend | None:
+        if not self.cfg.local.enabled:
+            return None
+        from .ollama import OllamaBackend
+
+        log.info("local model: %s at %s (Claude answers if it can't)", self.cfg.local.model, self.cfg.local.url)
+        return OllamaBackend(self.cfg.local)
 
     async def start(self, http: bool = True, udp: bool = True) -> None:
         loop = asyncio.get_running_loop()
@@ -312,7 +325,7 @@ class Brain:
     async def respond(self, request: str) -> str:
         self.conv.start_reply()
         self.robot.set_anim("listening", urgent=True)
-        deltas = self.agent.reply(
+        deltas = self.mind.reply(
             request, self.conv.messages(), self.context(),
             session_names=[s.folder for s in self.store.all()],
         )
@@ -488,6 +501,10 @@ class Brain:
                                                float(inp.get("degrees", 5)))
             except RobotError as e:
                 return f"Robot refused: {e}"
+        if name == "remember":
+            return self.memory.remember(str(inp.get("fact", "")))
+        if name == "forget":
+            return self.memory.forget(str(inp.get("about", "")))
         return f"Unknown tool {name}."
 
     async def _explore(self, joints) -> None:
@@ -503,7 +520,11 @@ class Brain:
     def context(self) -> str:
         now = self.clock()
         auto = self.focus.mode == "auto"
-        lines = [
+        lines = []
+        taught = self.memory.prompt()
+        if taught:
+            lines += [taught, ""]
+        lines += [
             "Focus mode: " + ("auto (you follow the most recently active session)." if auto
                               else "explicit (Joe chose this session)."),
             "Sessions:",
@@ -528,7 +549,8 @@ class Brain:
             "mic": self.stats.as_dict(now) | {"udp_port": self.udp_port, "in_speech": self.segmenter.in_speech},
             "conversation": self.conv.as_dict(now) | {
                 "last_transcript": self.last_transcript, "last_ignored": self.last_ignored,
-                "last_reply": self.conv.last_reply, "model": self.agent.last_model,
+                "last_reply": self.conv.last_reply, "model": self.mind.last_model,
+                "answered_by": self.mind.last_engine,
             },
             "robot": self.robot.as_dict() | {"animation": self.robot_anim,
                                              "mic": self.robot_health.get("mic"),

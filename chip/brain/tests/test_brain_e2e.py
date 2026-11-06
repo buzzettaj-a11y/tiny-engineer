@@ -25,6 +25,7 @@ def make_cfg(robot, tmp_path, **wake):
     cfg.brain.udp_port = 0
     cfg.ranges.enabled = False
     cfg.idle.enabled = False
+    cfg.local.enabled = False  # tests that want a local model pass local_llm
     cfg.audio.vad = "energy"
     cfg.wake.follow_up_s = wake.get("follow_up_s", 1.5)
     cfg.wake.ack = wake.get("ack", "Yes?")

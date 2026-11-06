@@ -37,3 +37,18 @@ def test_overrides_types_and_unknown_keys(caplog, tmp_path):
         from_dict({"focus": {"heads_up": "yes"}})
     assert load(tmp_path / "missing.toml").robot.url == Config().robot.url
     assert cfg.resolve("a/b.json").is_absolute()
+
+
+def test_local_model_section_is_read_with_claude_kept_as_backup():
+    cfg = from_dict({"local": {"model": "qwen3:8b", "url": "http://pc:11434", "first_token_timeout_s": 4,
+                               "enabled": False},
+                     "brain": {"memory_file": "mem.json"}})
+    assert cfg.local.model == "qwen3:8b"
+    assert cfg.local.url == "http://pc:11434"
+    assert cfg.local.first_token_timeout_s == 4.0
+    assert cfg.local.enabled is False
+    assert cfg.brain.memory_file == "mem.json"
+    default = Config()
+    assert default.local.enabled is True
+    assert default.local.url == "http://127.0.0.1:11434"
+    assert default.claude.model == "claude-sonnet-5-5"

@@ -3,6 +3,7 @@ contract, and fake STT / TTS / Claude backends."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import struct
 import threading
@@ -263,7 +264,8 @@ class FakeTTS(TTSBackend):
 
 
 class FakeLLM(LLMBackend):
-    """Scripted rounds. Each round: {"text": [...deltas], "tools": [(name, input), ...]}."""
+    """Scripted rounds. Each round: {"text": [...deltas], "tools": [(name, input), ...]},
+    optionally "delay" (seconds before the first event) or "error" (raise instead)."""
 
     def __init__(self, rounds: list[dict]):
         self.rounds = list(rounds)
@@ -274,6 +276,10 @@ class FakeLLM(LLMBackend):
 
         self.calls.append({"model": model, "system": system, "messages": copy.deepcopy(messages), "tools": tools})
         r = self.rounds.pop(0) if self.rounds else {"text": ["Okay."]}
+        if r.get("delay"):
+            await asyncio.sleep(r["delay"])
+        if r.get("error"):
+            raise ConnectionError(r["error"])
         content = []
         text = "".join(r.get("text", []))
         for d in r.get("text", []):
@@ -298,3 +304,88 @@ def speech_like(seconds: float, rate: int = 22050, amp: float = 0.3, seed: int =
 def silence(seconds: float, rate: int = 22050, amp: float = 0.0005, seed: int = 1) -> np.ndarray:
     rng = np.random.default_rng(seed)
     return (amp * rng.standard_normal(int(seconds * rate))).astype(np.float32)
+
+
+class FakeOllama:
+    """A tiny HTTP server speaking Ollama's native /api/chat streaming format
+    (newline-delimited JSON, docs/api.md "Generate a chat completion").
+
+    ``replies``: one entry per request, either a list of chunk dicts (streamed
+    as NDJSON, status 200) or a ``(status, body_dict)`` tuple.
+    """
+
+    def __init__(self, replies: list, models: list[str] | None = None):
+        self.replies = list(replies)
+        self.models = list(models or [])
+        self.requests: list[dict] = []
+        outer = self
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                if self.path != "/api/tags":
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                data = json.dumps({"models": [{"name": m, "model": m} for m in outer.models]}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_POST(self):
+                n = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(n) or b"{}")
+                outer.requests.append({"path": self.path, "body": body})
+                reply = outer.replies.pop(0) if outer.replies else [{"message": {"role": "assistant", "content": "Okay."}, "done": False}, {"done": True, "done_reason": "stop"}]
+                if isinstance(reply, tuple):
+                    status, obj = reply
+                    data = json.dumps(obj).encode()
+                    self.send_response(status)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/x-ndjson")
+                self.end_headers()
+                for chunk in reply:
+                    if "sleep" in chunk:
+                        time.sleep(chunk["sleep"])
+                        continue
+                    self.wfile.write(json.dumps({"model": body.get("model"), **chunk}).encode() + b"\n")
+                    self.wfile.flush()
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+
+    @property
+    def url(self) -> str:
+        return f"http://127.0.0.1:{self.server.server_address[1]}"
+
+    def start(self) -> "FakeOllama":
+        self.thread.start()
+        return self
+
+    def stop(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def ollama_text(*parts: str) -> list[dict]:
+    """Chunks for a plain streamed answer."""
+    return [{"message": {"role": "assistant", "content": p}, "done": False} for p in parts] + [
+        {"message": {"role": "assistant", "content": ""}, "done": True, "done_reason": "stop", "eval_count": 5}]
+
+
+def ollama_tool(name: str, args: dict, text: str = "") -> list[dict]:
+    """Chunks for an answer that calls one tool (tool_calls arrive in a non-final chunk)."""
+    chunks = [{"message": {"role": "assistant", "content": text}, "done": False}] if text else []
+    return chunks + [
+        {"message": {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": name, "arguments": args}}]},
+         "done": False},
+        {"message": {"role": "assistant", "content": ""}, "done": True, "done_reason": "stop"}]

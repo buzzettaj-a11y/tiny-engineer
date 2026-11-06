@@ -33,6 +33,8 @@ class BrainCfg:
     udp_port: int = 47100  # mic stream from the robot
     token: str = ""  # optional shared secret for brain HTTP (X-Chip-Token or Bearer)
     state_file: str = "chip_state.json"  # explored ranges etc.
+    memory_file: str = "chip_memory.json"  # what Joe has taught Chip ("Chip, remember ...")
+    memory_max_items: int = 50
     log_level: str = "INFO"
 
 
@@ -90,6 +92,19 @@ class ClaudeCfg:
 
 
 @dataclass
+class LocalCfg:
+    enabled: bool = True  # answer with the local model first when Ollama is running
+    url: str = "http://127.0.0.1:11434"  # Ollama on this PC
+    model: str = "qwen3:4b"  # any Ollama model that supports tools
+    first_token_timeout_s: float = 3.0  # local model must start answering within this, else Claude answers
+    keep_alive: str = "30m"  # keep the model loaded between conversations
+    num_ctx: int = 8192  # context window; Ollama's default is too small for the session notes
+    max_tokens: int = 200
+    temperature: float = 0.7
+    think: bool = False  # thinking models (e.g. qwen3) are much slower with thinking on
+
+
+@dataclass
 class TtsCfg:
     backend: str = "auto"  # auto | piper | sapi | none
     piper_model: str = ""  # path to a .onnx voice (its .onnx.json must sit next to it)
@@ -143,6 +158,7 @@ class Config:
     audio: AudioCfg = field(default_factory=AudioCfg)
     wake: WakeCfg = field(default_factory=WakeCfg)
     stt: SttCfg = field(default_factory=SttCfg)
+    local: LocalCfg = field(default_factory=LocalCfg)
     claude: ClaudeCfg = field(default_factory=ClaudeCfg)
     tts: TtsCfg = field(default_factory=TtsCfg)
     focus: FocusCfg = field(default_factory=FocusCfg)

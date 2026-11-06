@@ -64,6 +64,9 @@ def cmd_check(cfg: Config, path: Path) -> int:
 
     print(f"config file      : {path} ({'found' if path.exists() else 'missing, using defaults'})")
     print(f"robot            : {cfg.robot.url}")
+    from .ollama import local_status
+
+    print(f"local AI (Ollama): {local_status(cfg.local)}")
     print(f"ANTHROPIC_API_KEY: {'set' if os.environ.get('ANTHROPIC_API_KEY') else 'NOT SET'}")
     print(f"anthropic        : {has('anthropic')}")
     print(f"faster_whisper   : {has('faster_whisper')}   model {cfg.stt.model}")

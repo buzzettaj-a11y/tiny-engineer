@@ -1,0 +1,3 @@
+# The local model answers first and hands off to Claude
+
+Joe ranked fast replies above smart ones, then privacy, then cost. So a local model on the home PC (via Ollama) answers every conversation turn first, and has a tool to hand a question off to Claude, out loud ("let me ask Claude"), when it needs reasoning it can't do well. If the local model is missing, too slow to start answering, or fails, Claude answers instead (fallback), so Chip never goes silent. Claude-only and Claude-first were rejected: they need internet for every word and cost more; local-only was rejected because small local models are noticeably weaker at nuanced answers about code.

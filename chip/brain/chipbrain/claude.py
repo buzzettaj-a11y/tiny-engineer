@@ -58,6 +58,27 @@ TOOLS: list[dict] = [
         },
     },
     {
+        "name": "remember",
+        "description": (
+            "Save something Joe teaches you so you remember it from now on (a preference, a name, a rule). "
+            "Use when he says remember, from now on, always or never. Keep it to one short sentence about Joe."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"fact": {"type": "string", "description": "One short sentence, e.g. 'Joe likes one-sentence updates'."}},
+            "required": ["fact"],
+        },
+    },
+    {
+        "name": "forget",
+        "description": "Remove things you were taught that match these words. Use when Joe says forget or stop doing something.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"about": {"type": "string", "description": "Words from the thing to forget."}},
+            "required": ["about"],
+        },
+    },
+    {
         "name": "find_ranges",
         "description": (
             "Slowly explore each joint's movement range until it bumps, then save safer limits. "
@@ -97,7 +118,7 @@ PERSONA = """You are Chip, a small desk robot (a Tiny Engineer) on {owner}'s des
 
 Everything you write is spoken aloud by a tiny speaker. Reply in 1 to 3 short sentences of plain spoken English. Never use markdown, lists, code, emoji, URLs or file paths; say project and file names naturally. Lead with the answer. {owner} has ADHD: be brief, concrete and warm, and when it helps, name the one next thing to do. Only report what the session notes below say; if you don't know, say so.
 
-Tools let you change which session you watch, list sessions, mute your mic, and find or adjust your joint ranges. Use range and mute tools only when {owner} asks. After a tool, say what you did in a few words."""
+Tools let you change which session you watch, list sessions, mute your mic, remember or forget what Joe teaches you, and find or adjust your joint ranges. Use range and mute tools only when {owner} asks. After a tool, say what you did in a few words."""
 
 WORK_WORDS = {
     "session", "sessions", "claude", "task", "tasks", "error", "errors", "focus", "range", "ranges", "build",
@@ -169,34 +190,70 @@ def _block_dict(b: Any) -> dict:
 ToolRunner = Callable[[str, dict], Awaitable[str]]
 
 
+class HandOff(Exception):
+    """The model asked for someone smarter (see Mind)."""
+
+    def __init__(self, question: str, spoke: str):
+        super().__init__(question)
+        self.question = question
+        self.spoke = spoke
+
+
 class ChipAgent:
-    def __init__(self, cfg: ClaudeCfg, backend: LLMBackend | None, run_tool: ToolRunner):
+    """One model, its tools and the tool loop. Yields spoken text deltas.
+
+    ``model``: fixed model name; empty = choose per message (Claude's fast_model).
+    ``handoff``: tool name that ends this agent's turn by raising HandOff.
+    ``fail_quietly``: on backend errors say sorry (Claude) or raise (local, so
+    the caller can fall back).
+    """
+
+    def __init__(self, cfg: ClaudeCfg, backend: LLMBackend | None, run_tool: ToolRunner, *,
+                 tools: list[dict] | None = None, model: str = "", handoff: str = "",
+                 fail_quietly: bool = True, system_extra: str = ""):
         self.cfg = cfg
         self.backend = backend
         self.run_tool = run_tool
+        self.tools = TOOLS if tools is None else tools
+        self.model = model
+        self.handoff = handoff
+        self.fail_quietly = fail_quietly
+        self.system_extra = system_extra
         self.last_model = ""
 
     async def reply(self, user_text: str, history: list[dict], context: str,
                     session_names: list[str] | None = None, now: datetime | None = None) -> AsyncIterator[str]:
-        """Yield spoken text deltas. Tool calls run between model rounds."""
+        """Yield spoken text deltas. Tool calls run between model rounds.
+
+        An empty-string delta means "the model has started answering" (it may
+        be calling a tool first); callers that only speak can ignore it.
+        """
         if self.backend is None:
             yield "My brain isn't connected to Claude yet. Set the Anthropic API key and restart me."
             return
-        model = choose_model(self.cfg, user_text, session_names or [])
+        model = self.model or choose_model(self.cfg, user_text, session_names or [])
         self.last_model = model
         system = build_system(self.cfg, context, now)
+        if self.system_extra:
+            system = system.replace("\n\nNow:", "\n\n" + self.system_extra + "\n\nNow:", 1)
         messages = list(history) + [{"role": "user", "content": user_text}]
         spoke = False
+        said: list[str] = []
         try:
             for round_no in range(self.cfg.max_tool_rounds + 1):
                 content: list[dict] = []
                 stop_reason = None
                 if round_no and spoke:
                     yield " "
+                started = False
                 async for ev in self.backend.stream(model=model, system=system, messages=messages,
-                                                    tools=TOOLS, max_tokens=self.cfg.max_tokens):
+                                                    tools=self.tools, max_tokens=self.cfg.max_tokens):
+                    if not started:
+                        started = True
+                        yield ""
                     if ev[0] == "text":
                         spoke = True
+                        said.append(ev[1])
                         yield ev[1]
                     elif ev[0] == "final":
                         content, stop_reason = ev[1], ev[2]
@@ -205,6 +262,9 @@ class ChipAgent:
                 tool_uses = [b for b in content if b.get("type") == "tool_use"]
                 if not tool_uses:
                     return
+                for tu in tool_uses:
+                    if self.handoff and tu["name"] == self.handoff:
+                        raise HandOff(str((tu.get("input") or {}).get("question", "")), "".join(said))
                 messages.append({"role": "assistant", "content": content})
                 results = []
                 for tu in tool_uses:
@@ -218,7 +278,11 @@ class ChipAgent:
                     results.append({"type": "tool_result", "tool_use_id": tu["id"], "content": out,
                                     "is_error": is_error})
                 messages.append({"role": "user", "content": results})
+        except HandOff:
+            raise
         except Exception as e:
+            if not self.fail_quietly:
+                raise
             log.error("Claude call failed: %s", e)
             if not spoke:
                 yield "Sorry, I can't reach Claude right now."

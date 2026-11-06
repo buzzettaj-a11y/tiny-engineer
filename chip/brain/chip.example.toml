@@ -14,6 +14,8 @@ http_port = 47101
 udp_port = 47100                # the robot streams its mic here
 token = ""                      # optional: VMs must send it (install.js --token)
 state_file = "chip_state.json"  # explored joint ranges are remembered here
+memory_file = "chip_memory.json"  # what you've taught Chip ("Chip, remember ...")
+memory_max_items = 50
 log_level = "INFO"              # DEBUG for more detail
 
 [audio]
@@ -47,6 +49,20 @@ device = "cpu"                  # "cuda" if you have an NVIDIA GPU + CUDA libs
 compute_type = "int8"
 initial_prompt = "Talking to Chip, a desk robot."  # don't start it with "Chip" (Whisper may echo it)
 beam_size = 1
+
+[local]
+# Chip's own AI, running on this PC through Ollama (https://ollama.com).
+# It answers first and hands harder questions to Claude. If Ollama isn't
+# running, or the model is slow to start answering, Claude answers instead.
+enabled = true
+url = "http://127.0.0.1:11434"
+model = "qwen3:4b"               # any Ollama model with tool support; run: ollama pull qwen3:4b
+first_token_timeout_s = 3.0      # local model must start answering within this, else Claude answers
+keep_alive = "30m"               # keep the model loaded between conversations
+num_ctx = 8192                   # context window (Ollama's default is too small)
+max_tokens = 200
+temperature = 0.7
+think = false                    # thinking models are much slower with thinking on
 
 [claude]
 model = "claude-sonnet-5-5"
