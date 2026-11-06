@@ -119,3 +119,17 @@ Contribute/review process: [docs/pcb.md](docs/pcb.md). `expected-nets.yml`: [doc
 | PCB / KiCad | [docs/pcb.md](docs/pcb.md) |
 | Humans contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Docs index | [docs/README.md](docs/README.md) |
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as tasks in Joe's Asana project "Tiny Engineer" (created on first use). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The default five triage labels, as Asana tags. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
