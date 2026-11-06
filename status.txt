@@ -1,0 +1,10 @@
+firmware=0
+littlefs=0
+native-tests=0
+ui-install=0
+ui-lint=0
+ui-test=0
+cli-tests=0
+brain-install=0
+brain-tests=0
+hook-tests=0

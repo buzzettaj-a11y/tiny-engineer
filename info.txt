@@ -1,0 +1,4 @@
+source_sha=487f9a12b5eec7bc1e23912562df4db581fd6924
+run_url=https://github.com/buzzettaj-a11y/tiny-engineer/actions/runs/42191891860
+built_at=2026-11-06T09:06:28Z
+offsets: bootloader=0x0 partitions=0x8000 firmware=0x10000 littlefs=0x220000

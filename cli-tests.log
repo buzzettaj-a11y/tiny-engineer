@@ -1,0 +1,868 @@
+
+added 21 packages, and audited 22 packages in 571ms
+
+14 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> tiny-engineer@0.3.0 test
+> node --test
+
+TAP version 13
+# Subtest: parseCommonArgs extracts --url and rest
+ok 1 - parseCommonArgs extracts --url and rest
+  ---
+  duration_ms: 2.705028
+  type: 'test'
+  ...
+# Subtest: parseCommonArgs extracts --transport and --port
+ok 2 - parseCommonArgs extracts --transport and --port
+  ---
+  duration_ms: 2.306714
+  type: 'test'
+  ...
+# Subtest: parseCommonArgs help and missing --url value
+ok 3 - parseCommonArgs help and missing --url value
+  ---
+  duration_ms: 0.290112
+  type: 'test'
+  ...
+# Subtest: parseCommonArgs accepts quiet before or after ide id
+ok 4 - parseCommonArgs accepts quiet before or after ide id
+  ---
+  duration_ms: 0.258432
+  type: 'test'
+  ...
+# Subtest: parseAnimArgs requires name
+ok 5 - parseAnimArgs requires name
+  ---
+  duration_ms: 0.539206
+  type: 'test'
+  ...
+# Subtest: parseAnimArgs extracts --transport
+ok 6 - parseAnimArgs extracts --transport
+  ---
+  duration_ms: 0.197479
+  type: 'test'
+  ...
+# Subtest: parseAnimArgs accepts -q after name
+ok 7 - parseAnimArgs accepts -q after name
+  ---
+  duration_ms: 0.320969
+  type: 'test'
+  ...
+# Subtest: parsePlayArgs requires wav path
+ok 8 - parsePlayArgs requires wav path
+  ---
+  duration_ms: 0.388696
+  type: 'test'
+  ...
+# Subtest: parsePlayArgs accepts --silent
+ok 9 - parsePlayArgs accepts --silent
+  ---
+  duration_ms: 0.575363
+  type: 'test'
+  ...
+# Subtest: stripGlobalFlags pulls leading quiet
+ok 10 - stripGlobalFlags pulls leading quiet
+  ---
+  duration_ms: 0.780526
+  type: 'test'
+  ...
+# Subtest: validateAnimName accepts firmware names
+ok 11 - validateAnimName accepts firmware names
+  ---
+  duration_ms: 3.365289
+  type: 'test'
+  ...
+# Subtest: validateAnimName rejects unknown names
+ok 12 - validateAnimName rejects unknown names
+  ---
+  duration_ms: 0.612523
+  type: 'test'
+  ...
+# Subtest: validatePlayAnimName accepts play path names
+ok 13 - validatePlayAnimName accepts play path names
+  ---
+  duration_ms: 0.811244
+  type: 'test'
+  ...
+# Subtest: validatePlayAnimName rejects ring
+ok 14 - validatePlayAnimName rejects ring
+  ---
+  duration_ms: 0.997751
+  type: 'test'
+  ...
+# Subtest: postAnim 200 → ok
+ok 15 - postAnim 200 → ok
+  ---
+  duration_ms: 1.071039
+  type: 'test'
+  ...
+# Subtest: postAnim 400 unknown animation → ok false with parsed error
+ok 16 - postAnim 400 unknown animation → ok false with parsed error
+  ---
+  duration_ms: 0.673287
+  type: 'test'
+  ...
+# Subtest: postAnim fetch throw → unreachable
+ok 17 - postAnim fetch throw → unreachable
+  ---
+  duration_ms: 0.783262
+  type: 'test'
+  ...
+# Subtest: postPlay 415 → ok false with body error
+ok 18 - postPlay 415 → ok false with body error
+  ---
+  duration_ms: 0.716036
+  type: 'test'
+  ...
+# Subtest: postPlay network error → unreachable
+ok 19 - postPlay network error → unreachable
+  ---
+  duration_ms: 0.811183
+  type: 'test'
+  ...
+# Subtest: formatRobotError falls back to HTTP status
+ok 20 - formatRobotError falls back to HTTP status
+  ---
+  duration_ms: 2.348091
+  type: 'test'
+  ...
+# Subtest: afterFileEdit formats path and edits
+ok 21 - afterFileEdit formats path and edits
+  ---
+  duration_ms: 1.240795
+  type: 'test'
+  ...
+# Subtest: afterFileEdit with no edits still headers
+ok 22 - afterFileEdit with no edits still headers
+  ---
+  duration_ms: 1.606578
+  type: 'test'
+  ...
+# Subtest: missing file_path yields nothing
+ok 23 - missing file_path yields nothing
+  ---
+  duration_ms: 0.166
+  type: 'test'
+  ...
+# Subtest: truncates long edit sides
+ok 24 - truncates long edit sides
+  ---
+  duration_ms: 0.24654
+  type: 'test'
+  ...
+# Subtest: collapses newlines in edits
+ok 25 - collapses newlines in edits
+  ---
+  duration_ms: 0.189123
+  type: 'test'
+  ...
+# Subtest: preToolUse Write reports touching path
+ok 26 - preToolUse Write reports touching path
+  ---
+  duration_ms: 0.223838
+  type: 'test'
+  ...
+# Subtest: preToolUse Read reports nothing
+ok 27 - preToolUse Read reports nothing
+  ---
+  duration_ms: 0.220882
+  type: 'test'
+  ...
+# Subtest: color style wraps icons
+ok 28 - color style wraps icons
+  ---
+  duration_ms: 0.179546
+  type: 'test'
+  ...
+# Subtest: configHasHook finds hook cursor command
+ok 29 - configHasHook finds hook cursor command
+  ---
+  duration_ms: 2.743719
+  type: 'test'
+  ...
+# Subtest: checkHealth returns ok on 200
+ok 30 - checkHealth returns ok on 200
+  ---
+  duration_ms: 1.03965
+  type: 'test'
+  ...
+# Subtest: checkHealth returns fail on throw
+ok 31 - checkHealth returns fail on throw
+  ---
+  duration_ms: 0.58957
+  type: 'test'
+  ...
+# Subtest: runDoctor prints without throwing
+ok 32 - runDoctor prints without throwing
+  ---
+  duration_ms: 2.592737
+  type: 'test'
+  ...
+# Subtest: commandForEvent appends hook type
+ok 33 - commandForEvent appends hook type
+  ---
+  duration_ms: 1.224194
+  type: 'test'
+  ...
+# Subtest: applyInstall writes tiny-engineer block with matcher hooks
+ok 34 - applyInstall writes tiny-engineer block with matcher hooks
+  ---
+  duration_ms: 0.515322
+  type: 'test'
+  ...
+# Subtest: applyInstall writes async command shape and is idempotent
+ok 35 - applyInstall writes async command shape and is idempotent
+  ---
+  duration_ms: 1.542398
+  type: 'test'
+  ...
+# Subtest: applyInstall keeps unrelated settings keys
+ok 36 - applyInstall keeps unrelated settings keys
+  ---
+  duration_ms: 2.14384
+  type: 'test'
+  ...
+# Subtest: planInstall lists cursor events
+ok 37 - planInstall lists cursor events
+  ---
+  duration_ms: 1.019251
+  type: 'test'
+  ...
+# Subtest: applyInstall preserves foreign hooks and is idempotent
+ok 38 - applyInstall preserves foreign hooks and is idempotent
+  ---
+  duration_ms: 0.456692
+  type: 'test'
+  ...
+# Subtest: PreInvocation maps to thinking
+ok 39 - PreInvocation maps to thinking
+  ---
+  duration_ms: 2.715656
+  type: 'test'
+  ...
+# Subtest: PreToolUse maps reading tools to reading
+ok 40 - PreToolUse maps reading tools to reading
+  ---
+  duration_ms: 0.239436
+  type: 'test'
+  ...
+# Subtest: PreToolUse maps typing tools to typing
+ok 41 - PreToolUse maps typing tools to typing
+  ---
+  duration_ms: 0.188692
+  type: 'test'
+  ...
+# Subtest: PostToolUse maps error to attention
+ok 42 - PostToolUse maps error to attention
+  ---
+  duration_ms: 0.174014
+  type: 'test'
+  ...
+# Subtest: Stop maps model_stop to ring
+ok 43 - Stop maps model_stop to ring
+  ---
+  duration_ms: 0.180657
+  type: 'test'
+  ...
+# Subtest: Stop maps error to error
+ok 44 - Stop maps error to error
+  ---
+  duration_ms: 0.183763
+  type: 'test'
+  ...
+# Subtest: Stop maps abort to abort
+ok 45 - Stop maps abort to abort
+  ---
+  duration_ms: 0.154609
+  type: 'test'
+  ...
+# Subtest: describeFiles reports write_to_file path
+ok 46 - describeFiles reports write_to_file path
+  ---
+  duration_ms: 1.214816
+  type: 'test'
+  ...
+# Subtest: lifecycle events map to their poses
+ok 47 - lifecycle events map to their poses
+  ---
+  duration_ms: 2.566357
+  type: 'test'
+  ...
+# Subtest: SessionStart welcomes only a fresh launch; every other start wakes up
+ok 48 - SessionStart welcomes only a fresh launch; every other start wakes up
+  ---
+  duration_ms: 0.285302
+  type: 'test'
+  ...
+# Subtest: PreToolUse maps reading tools to reading
+ok 49 - PreToolUse maps reading tools to reading
+  ---
+  duration_ms: 0.244797
+  type: 'test'
+  ...
+# Subtest: PreToolUse maps typing tools to typing
+ok 50 - PreToolUse maps typing tools to typing
+  ---
+  duration_ms: 0.236831
+  type: 'test'
+  ...
+# Subtest: PreToolUse skips unknown or missing tools
+ok 51 - PreToolUse skips unknown or missing tools
+  ---
+  duration_ms: 0.267138
+  type: 'test'
+  ...
+# Subtest: skips missing, unknown, or Cursor-cased hook_event_name
+ok 52 - skips missing, unknown, or Cursor-cased hook_event_name
+  ---
+  duration_ms: 0.227585
+  type: 'test'
+  ...
+# Subtest: describeFiles reports Write tool_input path
+ok 53 - describeFiles reports Write tool_input path
+  ---
+  duration_ms: 1.310575
+  type: 'test'
+  ...
+# Subtest: EVENT_ANIM maps reading events to reading
+ok 54 - EVENT_ANIM maps reading events to reading
+  ---
+  duration_ms: 1.236396
+  type: 'test'
+  ...
+# Subtest: EVENT_ANIM maps thinking events to thinking
+ok 55 - EVENT_ANIM maps thinking events to thinking
+  ---
+  duration_ms: 0.289359
+  type: 'test'
+  ...
+# Subtest: EVENT_ANIM maps typing events to typing
+ok 56 - EVENT_ANIM maps typing events to typing
+  ---
+  duration_ms: 0.155109
+  type: 'test'
+  ...
+# Subtest: postToolUseFailure maps to none (avoids false-positive error/abort)
+ok 57 - postToolUseFailure maps to none (avoids false-positive error/abort)
+  ---
+  duration_ms: 0.20912
+  type: 'test'
+  ...
+# Subtest: preToolUse maps reading tools to reading
+ok 58 - preToolUse maps reading tools to reading
+  ---
+  duration_ms: 0.154418
+  type: 'test'
+  ...
+# Subtest: preToolUse maps typing tools to typing
+ok 59 - preToolUse maps typing tools to typing
+  ---
+  duration_ms: 0.178233
+  type: 'test'
+  ...
+# Subtest: preToolUse skips unknown tools
+ok 60 - preToolUse skips unknown tools
+  ---
+  duration_ms: 0.188832
+  type: 'test'
+  ...
+# Subtest: stop maps aborted to abort
+ok 61 - stop maps aborted to abort
+  ---
+  duration_ms: 0.129561
+  type: 'test'
+  ...
+# Subtest: stop maps error to error
+ok 62 - stop maps error to error
+  ---
+  duration_ms: 0.343942
+  type: 'test'
+  ...
+# Subtest: stop maps completed or missing status to ring
+ok 63 - stop maps completed or missing status to ring
+  ---
+  duration_ms: 0.39192
+  type: 'test'
+  ...
+# Subtest: skips empty conversation_id or generation_id
+ok 64 - skips empty conversation_id or generation_id
+  ---
+  duration_ms: 0.197799
+  type: 'test'
+  ...
+# Subtest: skips missing or unknown hook_event_name
+ok 65 - skips missing or unknown hook_event_name
+  ---
+  duration_ms: 0.12323
+  type: 'test'
+  ...
+# Subtest: cursor.parseHook + mapToAnim round-trip stop → ring
+ok 66 - cursor.parseHook + mapToAnim round-trip stop → ring
+  ---
+  duration_ms: 0.3001
+  type: 'test'
+  ...
+# Subtest: cursor.parseHook returns null on bad JSON
+ok 67 - cursor.parseHook returns null on bad JSON
+  ---
+  duration_ms: 0.131436
+  type: 'test'
+  ...
+# Subtest: logTextFromPayload reads t field
+ok 68 - logTextFromPayload reads t field
+  ---
+  duration_ms: 1.391916
+  type: 'test'
+  ...
+# Subtest: handleMonitorMessage prints LOG frames only
+ok 69 - handleMonitorMessage prints LOG frames only
+  ---
+  duration_ms: 1.376136
+  type: 'test'
+  ...
+# Subtest: ok prints with checkmark; quiet suppresses
+ok 70 - ok prints with checkmark; quiet suppresses
+  ---
+  duration_ms: 2.058449
+  type: 'test'
+  ...
+# Subtest: error always prints with icon and prefix
+ok 71 - error always prints with icon and prefix
+  ---
+  duration_ms: 0.268832
+  type: 'test'
+  ...
+# Subtest: info goes to stderr writer and is quiet-sensitive
+ok 72 - info goes to stderr writer and is quiet-sensitive
+  ---
+  duration_ms: 0.269222
+  type: 'test'
+  ...
+# Subtest: runTest rejects unknown test name
+ok 73 - runTest rejects unknown test name
+  ---
+  duration_ms: 1.963021
+  type: 'test'
+  ...
+# Subtest: runReset --help prints usage
+ok 74 - runReset --help prints usage
+  ---
+  duration_ms: 0.587586
+  type: 'test'
+  ...
+# Subtest: runPark --help prints usage
+ok 75 - runPark --help prints usage
+  ---
+  duration_ms: 1.395513
+  type: 'test'
+  ...
+# Subtest: runPark fails closed on invalid transport
+ok 76 - runPark fails closed on invalid transport
+  ---
+  duration_ms: 0.620328
+  type: 'test'
+  ...
+# Subtest: TINY_ENGINEER_CONFIG_DIR overrides userConfigDir and cache path
+ok 77 - TINY_ENGINEER_CONFIG_DIR overrides userConfigDir and cache path
+  ---
+  duration_ms: 1.686566
+  type: 'test'
+  ...
+# Subtest: default Unix path uses ~/.config/tiny-engineer
+ok 78 - default Unix path uses ~/.config/tiny-engineer
+  ---
+  duration_ms: 0.456181
+  type: 'test'
+  ...
+# Subtest: list includes cursor, claude-code, antigravity
+ok 79 - list includes cursor, claude-code, antigravity
+  ---
+  duration_ms: 1.900325
+  type: 'test'
+  ...
+# Subtest: get returns each registered integration
+ok 80 - get returns each registered integration
+  ---
+  duration_ms: 0.324224
+  type: 'test'
+  ...
+# Subtest: claude-code sets hardExitAfterPost
+ok 81 - claude-code sets hardExitAfterPost
+  ---
+  duration_ms: 0.259264
+  type: 'test'
+  ...
+# Subtest: get returns undefined for unknown id
+ok 82 - get returns undefined for unknown id
+  ---
+  duration_ms: 0.172963
+  type: 'test'
+  ...
+# Subtest: all returns registered integrations
+ok 83 - all returns registered integrations
+  ---
+  duration_ms: 0.237894
+  type: 'test'
+  ...
+# Subtest: defaultResponseForHook allows PreToolUse and Stop
+ok 84 - defaultResponseForHook allows PreToolUse and Stop
+  ---
+  duration_ms: 2.241812
+  type: 'test'
+  ...
+# Subtest: antigravity.parseHook never returns null
+ok 85 - antigravity.parseHook never returns null
+  ---
+  duration_ms: 0.587075
+  type: 'test'
+  ...
+# Subtest: antigravity.respond prints decision JSON
+ok 86 - antigravity.respond prints decision JSON
+  ---
+  duration_ms: 0.339784
+  type: 'test'
+  ...
+# Subtest: cobs round-trips empty, zeros, and sparse payloads
+ok 87 - cobs round-trips empty, zeros, and sparse payloads
+  ---
+  duration_ms: 2.340125
+  type: 'test'
+  ...
+# Subtest: frame decoder resyncs after malformed input
+ok 88 - frame decoder resyncs after malformed input
+  ---
+  duration_ms: 0.57348
+  type: 'test'
+  ...
+# Subtest: pack/parse message header
+ok 89 - pack/parse message header
+  ---
+  duration_ms: 0.443878
+  type: 'test'
+  ...
+# Subtest: play attempts play_end after stream credit failure
+ok 90 - play attempts play_end after stream credit failure
+  ---
+  duration_ms: 4.008127
+  type: 'test'
+  ...
+# Subtest: play cancels credit waiter when port write fails
+ok 91 - play cancels credit waiter when port write fails
+  ---
+  duration_ms: 0.896924
+  type: 'test'
+  ...
+# Subtest: play does not double play_end on success
+ok 92 - play does not double play_end on success
+  ---
+  duration_ms: 1.495049
+  type: 'test'
+  ...
+# Subtest: port cache hit / miss / clear
+ok 93 - port cache hit / miss / clear
+  ---
+  duration_ms: 4.207048
+  type: 'test'
+  ...
+# Subtest: rankSerialPorts prefers Espressif VID
+ok 94 - rankSerialPorts prefers Espressif VID
+  ---
+  duration_ms: 0.634624
+  type: 'test'
+  ...
+# Subtest: connectSerialRobot uses cache hit then invalidates on fail
+ok 95 - connectSerialRobot uses cache hit then invalidates on fail
+  ---
+  duration_ms: 4.124013
+  type: 'test'
+  ...
+# Subtest: connectSerialRobot autodetects when cache miss
+ok 96 - connectSerialRobot autodetects when cache miss
+  ---
+  duration_ms: 1.415801
+  type: 'test'
+  ...
+# Subtest: waitCredit rejects on stream Error frame with reason text
+ok 97 - waitCredit rejects on stream Error frame with reason text
+  ---
+  duration_ms: 2.999785
+  type: 'test'
+  ...
+# Subtest: parseSetupArgs --yes without ide fails at run time; parser ok
+ok 98 - parseSetupArgs --yes without ide fails at run time; parser ok
+  ---
+  duration_ms: 1.876981
+  type: 'test'
+  ...
+# Subtest: parseSetupArgs reads flags without force
+ok 99 - parseSetupArgs reads flags without force
+  ---
+  duration_ms: 1.153732
+  type: 'test'
+  ...
+# Subtest: parseSetupArgs rejects removed force flags
+ok 100 - parseSetupArgs rejects removed force flags
+  ---
+  duration_ms: 0.325437
+  type: 'test'
+  ...
+# Subtest: runSetup --yes without ide exits 1
+ok 101 - runSetup --yes without ide exits 1
+  ---
+  duration_ms: 0.968396
+  type: 'test'
+  ...
+# Subtest: runSetup --dry-run does not write files
+ok 102 - runSetup --dry-run does not write files
+  ---
+  duration_ms: 2.297255
+  type: 'test'
+  ...
+# Subtest: runSetup --yes writes cursor hooks and user env not project .env
+ok 103 - runSetup --yes writes cursor hooks and user env not project .env
+  ---
+  duration_ms: 3.354237
+  type: 'test'
+  ...
+# Subtest: runSetup --yes --transport serial writes transport without URL
+ok 104 - runSetup --yes --transport serial writes transport without URL
+  ---
+  duration_ms: 2.4554
+  type: 'test'
+  ...
+# Subtest: runSetup --yes keeps conflicting user env values
+ok 105 - runSetup --yes keeps conflicting user env values
+  ---
+  duration_ms: 1.73151
+  type: 'test'
+  ...
+# Subtest: warnProjectOverrides names keys without token value
+ok 106 - warnProjectOverrides names keys without token value
+  ---
+  duration_ms: 0.890722
+  type: 'test'
+  ...
+# Subtest: runSetup aborts when hooks.json is invalid JSON
+ok 107 - runSetup aborts when hooks.json is invalid JSON
+  ---
+  duration_ms: 1.230054
+  type: 'test'
+  ...
+# Subtest: mergeEnvUrl respects force flag
+ok 108 - mergeEnvUrl respects force flag
+  ---
+  duration_ms: 0.815582
+  type: 'test'
+  ...
+# Subtest: interactive setup preserves --token when Enter would clear prompt
+ok 109 - interactive setup preserves --token when Enter would clear prompt
+  ---
+  duration_ms: 1.694942
+  type: 'test'
+  ...
+# Subtest: readEnvKey first assignment wins on duplicates
+ok 110 - readEnvKey first assignment wins on duplicates
+  ---
+  duration_ms: 0.465769
+  type: 'test'
+  ...
+# Subtest: mergeEnvKey private mode sets owner-only perms on POSIX
+ok 111 - mergeEnvKey private mode sets owner-only perms on POSIX
+  ---
+  duration_ms: 0.773433
+  type: 'test'
+  ...
+# Subtest: interactive setup confirms replace of differing user env URL
+ok 112 - interactive setup confirms replace of differing user env URL
+  ---
+  duration_ms: 1.33998
+  type: 'test'
+  ...
+# Subtest: interactive setup declines replace keeps stored URL
+ok 113 - interactive setup declines replace keeps stored URL
+  ---
+  duration_ms: 1.39931
+  type: 'test'
+  ...
+# Subtest: interactive HTTP blank token does not write TINY_ENGINEER_TOKEN
+ok 114 - interactive HTTP blank token does not write TINY_ENGINEER_TOKEN
+  ---
+  duration_ms: 1.372811
+  type: 'test'
+  ...
+# Subtest: setup leaves existing project .env byte-identical
+ok 115 - setup leaves existing project .env byte-identical
+  ---
+  duration_ms: 2.008687
+  type: 'test'
+  ...
+# Subtest: readStdin resolves with chunks when pipe never ends
+ok 116 - readStdin resolves with chunks when pipe never ends
+  ---
+  duration_ms: 52.020521
+  type: 'test'
+  ...
+# Subtest: readStdin resolves on end before timeout
+ok 117 - readStdin resolves on end before timeout
+  ---
+  duration_ms: 1.853487
+  type: 'test'
+  ...
+# Subtest: readStdin returns empty string for TTY
+ok 118 - readStdin returns empty string for TTY
+  ---
+  duration_ms: 0.300921
+  type: 'test'
+  ...
+# Subtest: createStyle color false leaves strings plain
+ok 119 - createStyle color false leaves strings plain
+  ---
+  duration_ms: 1.003762
+  type: 'test'
+  ...
+# Subtest: createStyle color true wraps with ANSI
+ok 120 - createStyle color true wraps with ANSI
+  ---
+  duration_ms: 0.24143
+  type: 'test'
+  ...
+# warning: withholding Authorization — project TINY_ENGINEER_URL with user TINY_ENGINEER_TOKEN
+# Subtest: resolveTransport defaults to http
+ok 121 - resolveTransport defaults to http
+  ---
+  duration_ms: 2.280103
+  type: 'test'
+  ...
+# Subtest: resolveTransport prefers flag over env
+ok 122 - resolveTransport prefers flag over env
+  ---
+  duration_ms: 0.341497
+  type: 'test'
+  ...
+# Subtest: resolveTransport rejects invalid values
+ok 123 - resolveTransport rejects invalid values
+  ---
+  duration_ms: 0.277007
+  type: 'test'
+  ...
+# Subtest: project .env transport is loaded for later commands
+ok 124 - project .env transport is loaded for later commands
+  ---
+  duration_ms: 1.809335
+  type: 'test'
+  ...
+# Subtest: project .env overrides user env transport
+ok 125 - project .env overrides user env transport
+  ---
+  duration_ms: 1.2224
+  type: 'test'
+  ...
+# Subtest: user env fills when project key absent
+ok 126 - user env fills when project key absent
+  ---
+  duration_ms: 1.186453
+  type: 'test'
+  ...
+# Subtest: getHttpAuthToken blocks user token against project-only URL
+ok 127 - getHttpAuthToken blocks user token against project-only URL
+  ---
+  duration_ms: 2.139511
+  type: 'test'
+  ...
+# Subtest: getHttpAuthToken allows process URL with user token
+ok 128 - getHttpAuthToken allows process URL with user token
+  ---
+  duration_ms: 1.245443
+  type: 'test'
+  ...
+# Subtest: applyUninstall removes tiny-engineer key only
+ok 129 - applyUninstall removes tiny-engineer key only
+  ---
+  duration_ms: 1.819564
+  type: 'test'
+  ...
+# Subtest: parseUninstallArgs reads flags
+ok 130 - parseUninstallArgs reads flags
+  ---
+  duration_ms: 2.071544
+  type: 'test'
+  ...
+# Subtest: parseUninstallArgs rejects --purge-env
+ok 131 - parseUninstallArgs rejects --purge-env
+  ---
+  duration_ms: 0.361775
+  type: 'test'
+  ...
+# Subtest: runUninstall --yes without ide exits 1
+ok 132 - runUninstall --yes without ide exits 1
+  ---
+  duration_ms: 0.771459
+  type: 'test'
+  ...
+# Subtest: runUninstall --dry-run does not write
+ok 133 - runUninstall --dry-run does not write
+  ---
+  duration_ms: 2.092142
+  type: 'test'
+  ...
+# Subtest: runUninstall --yes removes cursor hooks
+ok 134 - runUninstall --yes removes cursor hooks
+  ---
+  duration_ms: 2.114664
+  type: 'test'
+  ...
+# Subtest: applyUninstall keeps permissions and strips our Stop hook
+ok 135 - applyUninstall keeps permissions and strips our Stop hook
+  ---
+  duration_ms: 1.873184
+  type: 'test'
+  ...
+# Subtest: applyUninstall keeps foreign hooks and removes ours
+ok 136 - applyUninstall keeps foreign hooks and removes ours
+  ---
+  duration_ms: 1.796911
+  type: 'test'
+  ...
+# Subtest: planUninstall counts our entries
+ok 137 - planUninstall counts our entries
+  ---
+  duration_ms: 0.23054
+  type: 'test'
+  ...
+# Subtest: planUninstall missing file is zero
+ok 138 - planUninstall missing file is zero
+  ---
+  duration_ms: 1.403799
+  type: 'test'
+  ...
+# Subtest: run --version prints package version
+ok 139 - run --version prints package version
+  ---
+  duration_ms: 2.075301
+  type: 'test'
+  ...
+# Subtest: run -v prints package version
+ok 140 - run -v prints package version
+  ---
+  duration_ms: 0.377634
+  type: 'test'
+  ...
+# Subtest: run -q --version prints package version
+ok 141 - run -q --version prints package version
+  ---
+  duration_ms: 0.282106
+  type: 'test'
+  ...
+1..141
+# tests 141
+# suites 0
+# pass 141
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1034.564966

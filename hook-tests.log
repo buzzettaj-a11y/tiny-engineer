@@ -1,0 +1,118 @@
+TAP version 13
+# Subtest: trimEvent adds host and received_from, trims big fields
+ok 1 - trimEvent adds host and received_from, trims big fields
+  ---
+  duration_ms: 1.666788
+  type: 'test'
+  ...
+# Subtest: trimEvent keeps Bash commands short
+ok 2 - trimEvent keeps Bash commands short
+  ---
+  duration_ms: 0.274882
+  type: 'test'
+  ...
+# Subtest: eventsUrl and loadConfig
+ok 3 - eventsUrl and loadConfig
+  ---
+  duration_ms: 1.440245
+  type: 'test'
+  ...
+# Subtest: forwards the hook JSON to the brain and exits 0 silently
+ok 4 - forwards the hook JSON to the brain and exits 0 silently
+  ---
+  duration_ms: 68.833257
+  type: 'test'
+  ...
+# Subtest: uses chip-hook.json next to the script
+ok 5 - uses chip-hook.json next to the script
+  ---
+  duration_ms: 50.029129
+  type: 'test'
+  ...
+# Subtest: hanging brain: gives up within ~1.5 s, still exits 0
+ok 6 - hanging brain: gives up within ~1.5 s, still exits 0
+  ---
+  duration_ms: 1490.130927
+  type: 'test'
+  ...
+# Subtest: brain down, bad JSON, empty stdin, no URL, error status: all exit 0 silently
+ok 7 - brain down, bad JSON, empty stdin, no URL, error status: all exit 0 silently
+  ---
+  duration_ms: 264.180737
+  type: 'test'
+  ...
+# Subtest: stdin that never closes is cut off at the hard cap
+ok 8 - stdin that never closes is cut off at the hard cap
+  ---
+  duration_ms: 1534.128261
+  type: 'test'
+  ...
+# Subtest: applyInstall adds one entry per event, removes tiny-engineer, keeps the rest
+ok 9 - applyInstall adds one entry per event, removes tiny-engineer, keeps the rest
+  ---
+  duration_ms: 2.720552
+  type: 'test'
+  ...
+# Subtest: applyInstall can keep tiny-engineer hooks
+ok 10 - applyInstall can keep tiny-engineer hooks
+  ---
+  duration_ms: 0.329394
+  type: 'test'
+  ...
+# Subtest: applyUninstall removes only Chip entries
+ok 11 - applyUninstall removes only Chip entries
+  ---
+  duration_ms: 0.335926
+  type: 'test'
+  ...
+# Subtest: hookCommand uses forward slashes and quotes the path
+ok 12 - hookCommand uses forward slashes and quotes the path
+  ---
+  duration_ms: 0.168514
+  type: 'test'
+  ...
+# Subtest: install end to end: copies hook, saves URL, backs up, rewrites settings
+ok 13 - install end to end: copies hook, saves URL, backs up, rewrites settings
+  ---
+  duration_ms: 55.607577
+  type: 'test'
+  ...
+# Subtest: fresh machine without settings.json
+ok 14 - fresh machine without settings.json
+  ---
+  duration_ms: 0.894708
+  type: 'test'
+  ...
+# Subtest: dry run writes nothing
+ok 15 - dry run writes nothing
+  ---
+  duration_ms: 0.930214
+  type: 'test'
+  ...
+# Subtest: refuses broken settings.json and bad arguments
+ok 16 - refuses broken settings.json and bad arguments
+  ---
+  duration_ms: 1.039097
+  type: 'test'
+  ...
+# Subtest: --clean-project strips tiny-engineer hooks from a project
+ok 17 - --clean-project strips tiny-engineer hooks from a project
+  ---
+  duration_ms: 2.25811
+  type: 'test'
+  ...
+# Subtest: CLAUDE_EVENTS matches the tiny-engineer integration list
+ok 18 - CLAUDE_EVENTS matches the tiny-engineer integration list
+  ---
+  duration_ms: 0.75591
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3486.069538

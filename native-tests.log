@@ -1,0 +1,285 @@
+Verbosity level can be increased via `-v, -vv, or -vvv` option
+Collected 17 tests
+
+Processing test_ina219 in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_ina219/test_ina219.cpp:75: test_address_does_not_clash	[PASSED]
+test/test_ina219/test_ina219.cpp:76: test_config_bits	[PASSED]
+test/test_ina219/test_ina219.cpp:77: test_calibration_for_0p1_ohm_and_0p1_ma_lsb	[PASSED]
+test/test_ina219/test_ina219.cpp:78: test_shunt_raw_to_ma	[PASSED]
+test/test_ina219/test_ina219.cpp:79: test_word_is_big_endian	[PASSED]
+test/test_ina219/test_ina219.cpp:80: test_health_lost_after_consecutive_failures_and_recovers	[PASSED]
+---------------- native:test_ina219 [PASSED] Took 0.85 seconds ----------------
+
+Processing test_serial_protocol in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_serial_protocol/test_serial_protocol.cpp:92: test_pack_parse_round_trip	[PASSED]
+test/test_serial_protocol/test_serial_protocol.cpp:93: test_sync_json_includes_version_and_state	[PASSED]
+test/test_serial_protocol/test_serial_protocol.cpp:94: test_log_json_escapes	[PASSED]
+test/test_serial_protocol/test_serial_protocol.cpp:95: test_sync_message_pack	[PASSED]
+------------ native:test_serial_protocol [PASSED] Took 0.44 seconds ------------
+
+Processing test_audio_motion in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_audio_motion/test_audio_motion.cpp:127: test_idle_snapshot_inactive	[PASSED]
+test/test_audio_motion/test_audio_motion.cpp:128: test_silence_not_speaking	[PASSED]
+test/test_audio_motion/test_audio_motion.cpp:129: test_sustained_tone_speaking	[PASSED]
+test/test_audio_motion/test_audio_motion.cpp:130: test_onset_raises_emphasis	[PASSED]
+test/test_audio_motion/test_audio_motion.cpp:131: test_phrase_boundary_after_silence	[PASSED]
+test/test_audio_motion/test_audio_motion.cpp:132: test_end_clears_stream	[PASSED]
+------------- native:test_audio_motion [PASSED] Took 0.46 seconds -------------
+
+Processing test_wav_parser in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_wav_parser/test_wav_parser.cpp:198: test_delivers_samples_regardless_of_slicing	[PASSED]
+test/test_wav_parser/test_wav_parser.cpp:199: test_skips_unknown_chunks_including_padding	[PASSED]
+test/test_wav_parser/test_wav_parser.cpp:200: test_ignores_chunks_after_data	[PASSED]
+test/test_wav_parser/test_wav_parser.cpp:201: test_streaming_data_size_plays_until_body_ends	[PASSED]
+test/test_wav_parser/test_wav_parser.cpp:202: test_rejects_other_sample_rate	[PASSED]
+test/test_wav_parser/test_wav_parser.cpp:203: test_rejects_stereo	[PASSED]
+test/test_wav_parser/test_wav_parser.cpp:204: test_rejects_non_wav	[PASSED]
+test/test_wav_parser/test_wav_parser.cpp:205: test_body_shorter_than_header_is_not_wav	[PASSED]
+test/test_wav_parser/test_wav_parser.cpp:206: test_body_without_data_chunk_fails	[PASSED]
+-------------- native:test_wav_parser [PASSED] Took 0.47 seconds --------------
+
+Processing test_serial_frame in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_serial_frame/test_serial_frame.cpp:89: test_round_trip_payload	[PASSED]
+test/test_serial_frame/test_serial_frame.cpp:90: test_resync_after_malformed	[PASSED]
+test/test_serial_frame/test_serial_frame.cpp:91: test_noise_then_valid	[PASSED]
+test/test_serial_frame/test_serial_frame.cpp:92: test_rejects_oversized_payload_encode	[PASSED]
+------------- native:test_serial_frame [PASSED] Took 0.46 seconds -------------
+
+Processing test_expressions in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_expressions/test_expressions.cpp:95: test_names_and_invalid_ids	[PASSED]
+test/test_expressions/test_expressions.cpp:96: test_all_frames_match_original_designs	[PASSED]
+test/test_expressions/test_expressions.cpp:97: test_invalid_inputs_leave_buffer_untouched	[PASSED]
+test/test_expressions/test_expressions.cpp:98: test_frame_timing_and_loop_boundaries	[PASSED]
+test/test_expressions/test_expressions.cpp:99: test_callers_can_render_independently	[PASSED]
+-------------- native:test_expressions [PASSED] Took 0.45 seconds --------------
+
+Processing test_wav_header in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_wav_header/test_wav_header.cpp:161: test_valid_header_stops_at_pcm	[PASSED]
+test/test_wav_header/test_wav_header.cpp:162: test_rate_mismatch_rejected	[PASSED]
+test/test_wav_header/test_wav_header.cpp:163: test_format_mismatches_rejected	[PASSED]
+test/test_wav_header/test_wav_header.cpp:164: test_odd_and_extended_chunks_skipped	[PASSED]
+test/test_wav_header/test_wav_header.cpp:165: test_data_before_fmt_rejected	[PASSED]
+test/test_wav_header/test_wav_header.cpp:166: test_missing_or_short_fmt_rejected	[PASSED]
+-------------- native:test_wav_header [PASSED] Took 0.46 seconds --------------
+
+Processing test_servo_limits in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_servo_limits/test_servo_limits.cpp:177: test_hard_caps_inside_electrical_clamp	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:178: test_reset_soft_equals_saved_inside_hard	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:179: test_reset_keeps_saved_past_hard_caps	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:180: test_clamp	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:181: test_bump_narrows_max_two_degrees_inside	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:182: test_bump_narrows_min_two_degrees_inside	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:183: test_bump_never_past_saved_mid	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:184: test_bump_never_widens	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:185: test_backoff_toward_mid	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:186: test_backoff_retreats_from_obstacle_on_return_moves	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:187: test_travel_dir	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:188: test_dir_names	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:189: test_validate_ranges_ok	[PASSED]
+test/test_servo_limits/test_servo_limits.cpp:190: test_validate_ranges_rejects	[PASSED]
+------------- native:test_servo_limits [PASSED] Took 0.43 seconds -------------
+
+Processing test_explore_logic in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_explore_logic/test_explore_logic.cpp:62: test_excursion_cap_toward_max	[PASSED]
+test/test_explore_logic/test_explore_logic.cpp:63: test_excursion_cap_toward_min	[PASSED]
+test/test_explore_logic/test_explore_logic.cpp:64: test_hard_cap_wins_when_closer	[PASSED]
+test/test_explore_logic/test_explore_logic.cpp:65: test_worst_case_sweep_fits_time_limit	[PASSED]
+test/test_explore_logic/test_explore_logic.cpp:66: test_threshold_capped	[PASSED]
+test/test_explore_logic/test_explore_logic.cpp:67: test_baseline_plausibility	[PASSED]
+------------- native:test_explore_logic [PASSED] Took 0.56 seconds -------------
+
+Processing test_mic_protocol in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_mic_protocol/test_mic_protocol.cpp:403: test_packet_constants_match_protocol	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:404: test_header_layout	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:405: test_heartbeat_header_has_zero_samples	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:406: test_seq_wraps	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:407: test_flag_bits	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:408: test_sample_conversion_shift_and_saturation	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:409: test_convert_takes_left_slot_only	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:410: test_samples_little_endian	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:411: test_full_packet_roundtrip	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:412: test_level_silence_dc_and_tone	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:413: test_level_smoothing_converges	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:414: test_presence_needs_varying_left_slot	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:415: test_block_start_time	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:416: test_speaker_tail	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:417: test_button_debounce_toggles_once_per_press	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:418: test_button_never_fires_when_floating_high	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:419: test_mute_state_pending_presses_toggle	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:420: test_mute_state_explicit_set_settles_presses	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:421: test_mute_state_counter_wrap	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:422: test_switch_closed_is_listening_open_is_muted	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:423: test_button_mode_unchanged_by_switch_level	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:424: test_switch_level_debounce	[PASSED]
+test/test_mic_protocol/test_mic_protocol.cpp:425: test_switching_modes_at_runtime	[PASSED]
+------------- native:test_mic_protocol [PASSED] Took 0.70 seconds -------------
+
+Processing test_bump_detector in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_bump_detector/test_bump_detector.cpp:437: test_not_armed_until_still_samples_with_outputs_on	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:438: test_never_seeded_from_moving_samples	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:439: test_bump_needs_60ms_over_threshold_while_moving	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:440: test_threshold_is_above_baseline	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:441: test_threshold_zero_disables	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:442: test_absolute_trip_is_immediate	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:443: test_cooldown_500ms	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:444: test_slow_tick_rate_still_detects	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:445: test_static_stall_after_motion_ends	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:446: test_no_stall_when_limp	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:447: test_baseline_frozen_while_moving_and_ignores_high_samples	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:448: test_new_holding_load_accepted_slowly	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:449: test_window_open_angles_are_reported	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:450: test_rearm_after_release_keeps_powered_baseline	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:451: test_reset	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:452: test_tracker_slow_pose_counts_as_motion	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:453: test_tracker_tail	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:454: test_tracker_note_motion	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:455: test_tail_keeps_bump_window_open_after_move_ends	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:456: test_reviewer_trace_stall_after_bump_is_not_blamed_on_backoff	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:457: test_stall_blames_the_one_joint_that_just_stopped	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:458: test_stall_blame_uncertain_with_two_joints	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:459: test_claim_ends_on_a_new_target	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:460: test_clear_cooldown_unblinds_next_sweep	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:461: test_log_newest_first_and_wraps	[PASSED]
+test/test_bump_detector/test_bump_detector.cpp:462: test_log_entry_name_truncates	[PASSED]
+------------- native:test_bump_detector [PASSED] Took 0.60 seconds -------------
+
+Processing test_i2s_frame in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_i2s_frame/test_i2s_frame.cpp:54: test_slot_puts_sample_in_top_half	[PASSED]
+test/test_i2s_frame/test_i2s_frame.cpp:55: test_slot_keeps_sign_and_order	[PASSED]
+test/test_i2s_frame/test_i2s_frame.cpp:56: test_volume_scales_and_saturates	[PASSED]
+test/test_i2s_frame/test_i2s_frame.cpp:57: test_pack_duplicates_scaled_sample_to_both_slots	[PASSED]
+test/test_i2s_frame/test_i2s_frame.cpp:58: test_pack_zero_count_writes_nothing	[PASSED]
+--------------- native:test_i2s_frame [PASSED] Took 0.43 seconds ---------------
+
+Processing test_servo_norm in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_servo_norm/test_servo_norm.cpp:45: test_norm_mid_is_average	[PASSED]
+test/test_servo_norm/test_servo_norm.cpp:46: test_norm_ends	[PASSED]
+test/test_servo_norm/test_servo_norm.cpp:47: test_norm_saturates	[PASSED]
+test/test_servo_norm/test_servo_norm.cpp:48: test_deg_to_norm_roundtrip	[PASSED]
+test/test_servo_norm/test_servo_norm.cpp:49: test_stock_head_identity	[PASSED]
+-------------- native:test_servo_norm [PASSED] Took 0.46 seconds --------------
+
+Processing test_pose_logic in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_pose_logic/test_pose_logic.cpp:75: test_norm_validation	[PASSED]
+test/test_pose_logic/test_pose_logic.cpp:76: test_ms_validation	[PASSED]
+test/test_pose_logic/test_pose_logic.cpp:77: test_effective_ms_keeps_request_when_slow_enough	[PASSED]
+test/test_pose_logic/test_pose_logic.cpp:78: test_effective_ms_stretches_to_respect_max_speed	[PASSED]
+test/test_pose_logic/test_pose_logic.cpp:79: test_interpolate_ends_and_midpoint	[PASSED]
+test/test_pose_logic/test_pose_logic.cpp:80: test_interpolate_monotonic_and_eased	[PASSED]
+test/test_pose_logic/test_pose_logic.cpp:81: test_interpolated_speed_respects_cap	[PASSED]
+-------------- native:test_pose_logic [PASSED] Took 0.44 seconds --------------
+
+Processing test_cobs in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_cobs/test_cobs.cpp:67: test_empty_payload	[PASSED]
+test/test_cobs/test_cobs.cpp:68: test_sparse_zeros	[PASSED]
+test/test_cobs/test_cobs.cpp:69: test_max_chunk_payload	[PASSED]
+test/test_cobs/test_cobs.cpp:70: test_no_zeros	[PASSED]
+----------------- native:test_cobs [PASSED] Took 0.45 seconds -----------------
+
+Processing test_wifi_network_list in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_wifi_network_list/test_wifi_network_list.cpp:89: test_add_keeps_order	[PASSED]
+test/test_wifi_network_list/test_wifi_network_list.cpp:90: test_add_rejects_duplicates	[PASSED]
+test/test_wifi_network_list/test_wifi_network_list.cpp:91: test_add_rejects_a_sixth_network	[PASSED]
+test/test_wifi_network_list/test_wifi_network_list.cpp:92: test_add_rejects_invalid_credentials	[PASSED]
+test/test_wifi_network_list/test_wifi_network_list.cpp:93: test_load_round_trips_saved_blob	[PASSED]
+test/test_wifi_network_list/test_wifi_network_list.cpp:94: test_load_rejects_corrupt_blob	[PASSED]
+----------- native:test_wifi_network_list [PASSED] Took 0.59 seconds -----------
+
+Processing test_settings_validate in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_settings_validate/test_settings_validate.cpp:286: test_brain_host	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:287: test_brain_port	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:288: test_bump_threshold	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:289: test_mic_shift	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:290: test_patch_names_chip_fields	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:291: test_mute_switch_field	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:292: test_hostname_rejects_invalid	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:293: test_hostname_accepts_valid	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:294: test_sleep_timeout	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:295: test_continuous_timeout	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:296: test_volume	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:297: test_loading	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:298: test_eyes_style	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:299: test_access_token	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:300: test_wifi_ssid	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:301: test_wifi_password	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:302: test_servo_ranges	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:303: test_patch_names_the_first_invalid_field	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:304: test_patch_names_its_setup_only_step	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:305: test_rgb_order	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:306: test_link_mode	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:307: test_link_mode_patch_rejects_empty	[PASSED]
+test/test_settings_validate/test_settings_validate.cpp:308: test_link_mode_patch_denied_outside_setup	[PASSED]
+----------- native:test_settings_validate [PASSED] Took 0.65 seconds -----------
+
+=================================== SUMMARY ===================================
+Environment    Test                    Status    Duration
+-------------  ----------------------  --------  ------------
+native         test_ina219             PASSED    00:00:00.851
+native         test_serial_protocol    PASSED    00:00:00.436
+native         test_audio_motion       PASSED    00:00:00.457
+native         test_wav_parser         PASSED    00:00:00.473
+native         test_serial_frame       PASSED    00:00:00.460
+native         test_expressions        PASSED    00:00:00.449
+native         test_wav_header         PASSED    00:00:00.461
+native         test_servo_limits       PASSED    00:00:00.434
+native         test_explore_logic      PASSED    00:00:00.560
+native         test_mic_protocol       PASSED    00:00:00.702
+native         test_bump_detector      PASSED    00:00:00.601
+native         test_i2s_frame          PASSED    00:00:00.429
+native         test_servo_norm         PASSED    00:00:00.459
+native         test_pose_logic         PASSED    00:00:00.440
+native         test_cobs               PASSED    00:00:00.452
+native         test_wifi_network_list  PASSED    00:00:00.589
+native         test_settings_validate  PASSED    00:00:00.654
+================ 159 test cases: 159 succeeded in 00:00:08.907 ================

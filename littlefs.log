@@ -1,0 +1,40 @@
+Processing esp32-c3-devkitm-1 (platform: https://github.com/pioarduino/platform-espressif32/releases/download/stable/platform-espressif32.zip; board: esp32-c3-devkitm-1; framework: arduino)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+Firmware version: 487f9a1
+Copied bell.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/bell.wav
+Copied welcome.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/welcome.wav
+Copied attention.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/attention.wav
+Copied error.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/error.wav
+Copied abort.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/abort.wav
+Copied dead.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/dead.wav
+Resampled WAVs to 22050 Hz
+Audio image 696464 bytes (limit 1835008)
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32-c3-devkitm-1.html
+PLATFORM: Espressif 32 (55.3.312) > Espressif ESP32-C3-DevKitM-1
+HARDWARE: ESP32C3 160MHz, 320KB RAM, 4MB Flash
+DEBUG: Current (cmsis-dap) External (cmsis-dap, esp-bridge, esp-builtin, esp-prog, esp-prog-2, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - contrib-piohome @ 3.4.4 
+ - framework-arduinoespressif32 @ 3.3.12 
+ - framework-arduinoespressif32-libs @ 5.5.5+sha.b774170ff46 
+ - tool-esptoolpy @ 5.4.0 
+ - tool-riscv32-esp-elf-gdb @ 17.1.0+20260402 
+ - toolchain-riscv32-esp @ 14.2.0+20260121
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ off, Compatibility ~ soft
+Found 52 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- Adafruit PWM Servo Driver Library @ 3.0.3
+|-- Adafruit GFX Library @ 1.13.0
+|-- Adafruit SSD1306 @ 2.5.17
+|-- ArduinoJson @ 7.4.3
+Building in release mode
+Building FS image from 'data' directory to .pio/build/esp32-c3-devkitm-1/littlefs.bin
+========================= [SUCCESS] Took 2.61 seconds =========================
+
+Environment         Status    Duration
+------------------  --------  ------------
+esp32-c3-devkitm-1  SUCCESS   00:00:02.614
+========================= 1 succeeded in 00:00:02.614 =========================

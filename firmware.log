@@ -1,0 +1,332 @@
+Processing esp32-c3-devkitm-1 (platform: https://github.com/pioarduino/platform-espressif32/releases/download/stable/platform-espressif32.zip; board: esp32-c3-devkitm-1; framework: arduino)
+--------------------------------------------------------------------------------
+Created pioarduino Python virtual environment: /home/runner/.platformio/penv
+Installed esptool from tl-install path: /home/runner/.platformio/packages/tool-esptoolpy
+Verbose mode can be enabled via `-v, --verbose` option
+Firmware version: 487f9a1
+Copied bell.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/bell.wav
+Copied welcome.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/welcome.wav
+Copied attention.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/attention.wav
+Copied error.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/error.wav
+Copied abort.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/abort.wav
+Copied dead.wav -> /home/runner/work/tiny-engineer/tiny-engineer/data/dead.wav
+Resampled WAVs to 22050 Hz
+Audio image 696464 bytes (limit 1835008)
+
+added 431 packages, and audited 432 packages in 1m
+
+149 packages are looking for funding
+  run `npm fund` for details
+
+25 vulnerabilities (24 moderate, 1 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+> build
+> vite build
+
+vite v8.3.3 building client environment for production...
+transforming...
+✓ 56 modules transformed.
+rendering chunks...
+[plugin vite:singlefile] 
+
+[plugin vite:singlefile] Inlining: index-BGynEQ5G.js
+[plugin vite:singlefile] Inlining: style-USby7qA9.css
+computing gzip size...
+dist/index.html  92.48 kB │ gzip: 27.72 kB
+
+✓ built in 72ms
+Embedded web UI: 92489 -> 27445 bytes gzipped
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32-c3-devkitm-1.html
+PLATFORM: Espressif 32 (55.3.312) > Espressif ESP32-C3-DevKitM-1
+HARDWARE: ESP32C3 160MHz, 320KB RAM, 4MB Flash
+DEBUG: Current (cmsis-dap) External (cmsis-dap, esp-bridge, esp-builtin, esp-prog, esp-prog-2, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - contrib-piohome @ 3.4.4 
+ - framework-arduinoespressif32 @ 3.3.12 
+ - framework-arduinoespressif32-libs @ 5.5.5+sha.b774170ff46 
+ - tool-esptoolpy @ 5.4.0 
+ - tool-riscv32-esp-elf-gdb @ 17.1.0+20260402 
+ - toolchain-riscv32-esp @ 14.2.0+20260121
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+Found 52 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- Adafruit PWM Servo Driver Library @ 3.0.3
+|-- Adafruit GFX Library @ 1.13.0
+|-- Adafruit SSD1306 @ 2.5.17
+|-- ArduinoJson @ 7.4.3
+|-- ESP_I2S @ 3.3.12
+|-- FS @ 3.3.12
+|-- LittleFS @ 3.3.12
+|-- TinyEngineerExpressions @ 0.1.0
+|-- Wire @ 3.3.12
+|-- Preferences @ 3.3.12
+|-- WiFi @ 3.3.12
+|-- WebServer @ 3.3.12
+|-- ArduinoOTA @ 3.3.12
+|-- DNSServer @ 3.3.12
+|-- ESPmDNS @ 3.3.12
+|-- nanocobs @ 0.1.0
+Building in release mode
+Compiling .pio/build/esp32-c3-devkitm-1/liba33/Wire/Wire.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib30b/SPI/SPI.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/libcbb/Adafruit BusIO/Adafruit_BusIO_Register.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/libcbb/Adafruit BusIO/Adafruit_GenericDevice.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/libcbb/Adafruit BusIO/Adafruit_I2CDevice.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/libcbb/Adafruit BusIO/Adafruit_SPIDevice.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib991/Adafruit PWM Servo Driver Library/Adafruit_PWMServoDriver.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/libd83/Adafruit GFX Library/Adafruit_GFX.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/libd83/Adafruit GFX Library/Adafruit_GrayOLED.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/libd83/Adafruit GFX Library/Adafruit_SPITFT.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/libd83/Adafruit GFX Library/glcdfont.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/libf59/Adafruit SSD1306/Adafruit_SSD1306.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib4b3/ESP_I2S/ESP_I2S.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib7aa/FS/FS.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib7aa/FS/vfs_api.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib620/LittleFS/LittleFS.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib540/TinyEngineerExpressions/TinyEngineerExpressions.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/libe70/Preferences/Preferences.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib487/Network/NetworkClient.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib487/Network/NetworkEvents.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib487/Network/NetworkInterface.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib487/Network/NetworkManager.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib487/Network/NetworkServer.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib487/Network/NetworkUdp.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib989/WiFi/AP.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib989/WiFi/STA.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib989/WiFi/WiFi.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib989/WiFi/WiFiAP.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib989/WiFi/WiFiGeneric.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib989/WiFi/WiFiMulti.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib989/WiFi/WiFiSTA.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib989/WiFi/WiFiScan.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib92c/Hash/PBKDF2_HMACBuilder.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib92c/Hash/SHA1Builder.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib92c/Hash/SHA2Builder.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib92c/Hash/SHA3Builder.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib1ce/WebServer/Parsing.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib1ce/WebServer/WebServer.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib1ce/WebServer/detail/mimetable.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib1ce/WebServer/middleware/AuthenticationMiddleware.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib1ce/WebServer/middleware/CorsMiddleware.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib1ce/WebServer/middleware/LoggingMiddleware.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib1ce/WebServer/middleware/MiddlewareChain.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib4b6/Update/HttpsOTAUpdate.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib4b6/Update/Updater.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib4b6/Update/UpdaterSHA256.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib4b6/Update/UpdaterSHA512.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib4b6/Update/Updater_Signing.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib4b6/ESPmDNS/ESPmDNS.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib134/ArduinoOTA/ArduinoOTA.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib59e/AsyncUDP/AsyncUDP.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/lib147/DNSServer/DNSServer.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/libe2b/nanocobs/cobs.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/abort.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/attention.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/controller.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/dead.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/error.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/listening.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/reading.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/registry.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/ring.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/sleep_anim.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/talking.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/thinking.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/typing.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/util.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/wakeup.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/animation/welcome.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/api/busy.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/api/commands.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/audio/audio.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/audio/audio_cues.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/audio/audio_motion.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/audio/i2s_frame.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/audio/wav_parser.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/audio/wav_stream.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/boot/boot_loading.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/controller.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/core/blink.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/core/draw.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/core/impact.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/core/util.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/abort.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/attention.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/dead.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/error.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/idle.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/listening.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/reading.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/ring.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/talking.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/thinking.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/typing.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/wakeup.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/modes/welcome.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/styles/classic.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/styles/cover.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/styles/dots.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/styles/eye_style_ids.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/styles/kaomoji.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/eyes/styles/registry.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/oled.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/oled_boot.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/oled_init.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/display/oled_test.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/hardware/activity.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/hardware/chip_temp.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/hardware/ina219.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/hardware/ina219_regs.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/hardware/pca9685_servos.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/hardware/rgb.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/hardware/servo_wrapper.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/access.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/anim_handlers.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/chip_handlers.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/health_handlers.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/play_handlers.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/request.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/response.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/routes.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/server.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/settings_handlers.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/setup_handlers.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/http/test_handlers.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/main.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/mic/mic.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/mic/mic_protocol.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/motion/bump_detector.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/motion/explore_logic.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/motion/pose_logic.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/motion/pose_move.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/motion/reflex.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/motion/servo_limits.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/network/ota.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/network/wifi_connect.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/robot_tick.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/serial/frame.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/serial/link.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/serial/play.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/serial/protocol.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/settings/getters.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/settings/load.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/settings/nvs.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/settings/validate.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/settings/values.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/settings/wifi_network_list.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/src/sleep.cpp.o
+Generating partitions .pio/build/esp32-c3-devkitm-1/partitions.bin
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/ColorFormat.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/Esp.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/FirmwareMSC.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/FunctionalInterrupt.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/HEXBuilder.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/HWCDC.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/HardwareSerial.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/HashBuilder.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/IPAddress.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/MD5Builder.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/MacAddress.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/Print.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/Stream.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/StreamString.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/StringUtils.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/Tone.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/USB.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/USBCDC.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/USBHost.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/USBMSC.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/WMath.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/WString.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/base64.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/cbuf.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/chip-debug-report.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-adc.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-bt.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-cpu.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-dac.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-gpio.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-hosted.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-i2c-ng.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-i2c-slave.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-i2c.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-ldo.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-ledc.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-log-wrapper.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-matrix.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-misc.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-periman.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-psram.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-rgb-led.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-rmt.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-sigmadelta.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-spi.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-time.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-timer.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-tinyusb.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-touch-ng.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-touch.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/esp32-hal-uart.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/firmware_msc_fat.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/freertos_stats.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/idf_openthread_mpool_wrapper.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/libb64/cdecode.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/libb64/cencode.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/main.cpp.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/stdlib_noniso.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/wiring_pulse.c.o
+Compiling .pio/build/esp32-c3-devkitm-1/FrameworkArduino/wiring_shift.c.o
+Archiving .pio/build/esp32-c3-devkitm-1/libFrameworkArduino.a
+Indexing .pio/build/esp32-c3-devkitm-1/libFrameworkArduino.a
+Linking .pio/build/esp32-c3-devkitm-1/firmware.elf
+                            Memory Type Usage Summary                             
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Memory Type/Section ┃ Used [bytes] ┃ Used [%] ┃ Remain [bytes] ┃ Total [bytes] ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ Flash Code          │      1092220 │          │                │               │
+│    .text            │      1092220 │          │                │               │
+│ Flash Data          │       314020 │          │                │               │
+│    .rodata          │       234008 │          │                │               │
+│    .eh_frame        │        79396 │          │                │               │
+│    .init_array      │          360 │          │                │               │
+│    .appdesc         │          256 │          │                │               │
+│ DRAM                │       128665 │    40.05 │         192631 │        321296 │
+│    .text            │        66884 │    20.82 │                │               │
+│    .bss             │        45608 │     14.2 │                │               │
+│    .data            │        16173 │     5.03 │                │               │
+└─────────────────────┴──────────────┴──────────┴────────────────┴───────────────┘
+Total image size: 1489297 bytes (.bin may be padded larger)
+Note: The reported total sizes may be smaller than those in the technical reference manual due to reserved memory and application configuration. The total flash size available for the application is not included by default, as it cannot be reliably determined due to the presence of other data like the bootloader, partition table, and application partition size. The total external RAM size is not included either, because the amount of RAM connected to the chip is detected at boot and is not known during the build.
+Retrieving maximum program size .pio/build/esp32-c3-devkitm-1/firmware.elf
+Checking size .pio/build/esp32-c3-devkitm-1/firmware.elf
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [==        ]  18.9% (used 61784 bytes from 327680 bytes)
+Flash: [=======   ]  65.2% (used 1409285 bytes from 2162688 bytes)
+Building .pio/build/esp32-c3-devkitm-1/firmware.bin
+esptool v5.4.0
+Creating ESP32-C3 image...
+Merged 3 ELF sections.
+Successfully created ESP32-C3 image.
+Creating binary "firmware.factory.bin" with:
+    Offset   | File
+ -  0x0000   | bootloader.bin
+ -  0x8000   | partitions.bin
+ -  0xe000   | boot_app0.bin
+ -  0x10000  | firmware.bin
+Successfully created combined binary image.
+======================== [SUCCESS] Took 153.17 seconds ========================
+
+Environment         Status    Duration
+------------------  --------  ------------
+esp32-c3-devkitm-1  SUCCESS   00:02:33.170
+========================= 1 succeeded in 00:02:33.170 =========================
