@@ -143,12 +143,19 @@ def choose_model(cfg: ClaudeCfg, text: str, session_names: list[str]) -> str:
     return cfg.fast_model
 
 
-def build_system(cfg: ClaudeCfg, context: str, now: datetime | None = None) -> str:
-    now = now or datetime.now()
-    return (
-        PERSONA.format(owner=cfg.owner_name)
-        + f"\n\nNow: {now.strftime('%A %H:%M')}.\n\n{context.strip()}"
-    )
+def now_line(now: datetime | None = None) -> str:
+    return f"Now: {(now or datetime.now()).strftime('%A %H:%M')}."
+
+
+def build_system(cfg: ClaudeCfg, context: str, now: datetime | None = None, *, extra: str = "",
+                 taught: str = "", with_context: bool = True) -> str:
+    """Persona, then the parts that rarely change (extra rules, what Joe taught),
+    then (unless with_context is False) the time and the live session notes."""
+    parts = [PERSONA.format(owner=cfg.owner_name)]
+    parts += [p.strip() for p in (extra, taught) if p and p.strip()]
+    if with_context:
+        parts += [now_line(now), context.strip()]
+    return "\n\n".join(p for p in parts if p)
 
 
 class LLMBackend:
@@ -204,39 +211,49 @@ class ChipAgent:
 
     ``model``: fixed model name; empty = choose per message (Claude's fast_model).
     ``handoff``: tool name that ends this agent's turn by raising HandOff.
-    ``fail_quietly``: on backend errors say sorry (Claude) or raise (local, so
-    the caller can fall back).
+    ``raise_errors``: on backend errors raise (local, so the caller can fall
+    back) instead of saying sorry (Claude).
+    ``context_in_user_turn``: put the time and live session notes in the
+    latest user message instead of the system prompt, so the system prompt
+    stays identical between turns and Ollama can reuse its prompt cache.
+    ``tools_run``: tools run during the latest reply, as (name, input, result).
     """
 
     def __init__(self, cfg: ClaudeCfg, backend: LLMBackend | None, run_tool: ToolRunner, *,
                  tools: list[dict] | None = None, model: str = "", handoff: str = "",
-                 fail_quietly: bool = True, system_extra: str = ""):
+                 raise_errors: bool = False, system_extra: str = "", context_in_user_turn: bool = False):
         self.cfg = cfg
         self.backend = backend
         self.run_tool = run_tool
         self.tools = TOOLS if tools is None else tools
         self.model = model
         self.handoff = handoff
-        self.fail_quietly = fail_quietly
+        self.raise_errors = raise_errors
         self.system_extra = system_extra
+        self.context_in_user_turn = context_in_user_turn
         self.last_model = ""
+        self.tools_run: list[tuple[str, dict, str]] = []
 
     async def reply(self, user_text: str, history: list[dict], context: str,
-                    session_names: list[str] | None = None, now: datetime | None = None) -> AsyncIterator[str]:
+                    session_names: list[str] | None = None, now: datetime | None = None,
+                    taught: str = "") -> AsyncIterator[str]:
         """Yield spoken text deltas. Tool calls run between model rounds.
 
         An empty-string delta means "the model has started answering" (it may
         be calling a tool first); callers that only speak can ignore it.
         """
+        self.tools_run = []
         if self.backend is None:
             yield "My brain isn't connected to Claude yet. Set the Anthropic API key and restart me."
             return
         model = self.model or choose_model(self.cfg, user_text, session_names or [])
         self.last_model = model
-        system = build_system(self.cfg, context, now)
-        if self.system_extra:
-            system = system.replace("\n\nNow:", "\n\n" + self.system_extra + "\n\nNow:", 1)
-        messages = list(history) + [{"role": "user", "content": user_text}]
+        system = build_system(self.cfg, context, now, extra=self.system_extra, taught=taught,
+                              with_context=not self.context_in_user_turn)
+        turn = user_text
+        if self.context_in_user_turn:
+            turn = f"[{now_line(now)}\n{context.strip()}]\n\n{self.cfg.owner_name} says: {user_text}"
+        messages = list(history) + [{"role": "user", "content": turn}]
         spoke = False
         said: list[str] = []
         try:
@@ -251,7 +268,7 @@ class ChipAgent:
                     if not started:
                         started = True
                         yield ""
-                    if ev[0] == "text":
+                    if ev[0] == "text" and ev[1]:
                         spoke = True
                         said.append(ev[1])
                         yield ev[1]
@@ -275,13 +292,15 @@ class ChipAgent:
                         log.exception("tool %s failed", tu["name"])
                         out, is_error = f"Tool failed: {e}", True
                     log.info("tool %s(%s) -> %s", tu["name"], tu.get("input"), out)
+                    if not is_error:
+                        self.tools_run.append((tu["name"], tu.get("input") or {}, out))
                     results.append({"type": "tool_result", "tool_use_id": tu["id"], "content": out,
                                     "is_error": is_error})
                 messages.append({"role": "user", "content": results})
         except HandOff:
             raise
         except Exception as e:
-            if not self.fail_quietly:
+            if self.raise_errors:
                 raise
             log.error("Claude call failed: %s", e)
             if not spoke:

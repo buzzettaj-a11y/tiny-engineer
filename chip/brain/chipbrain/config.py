@@ -97,7 +97,8 @@ class LocalCfg:
     url: str = "http://127.0.0.1:11434"  # Ollama on this PC
     model: str = "qwen3:4b"  # any Ollama model that supports tools
     first_token_timeout_s: float = 3.0  # local model must start answering within this, else Claude answers
-    keep_alive: str = "30m"  # keep the model loaded between conversations
+    retry_after_s: float = 300.0  # after the local model fails or stalls, Claude answers alone this long
+    keep_alive: str = "-1m"  # how long Ollama keeps the model loaded; negative = never unload
     num_ctx: int = 8192  # context window; Ollama's default is too small for the session notes
     max_tokens: int = 200
     temperature: float = 0.7

@@ -97,9 +97,9 @@ class Brain:
         self.tts = tts or make_tts(cfg.tts, cfg.resolve)
         self.llm: LLMBackend | None = self._make_llm() if llm is AUTO else llm
         self.local_llm: LLMBackend | None = self._make_local() if local_llm is AUTO else local_llm
-        self.mind = Mind(cfg.local, cfg.claude, self.local_llm, self.llm, self.run_tool)
+        self.mind = Mind(cfg.local, cfg.claude, self.local_llm, self.llm, self.run_tool, clock=clock)
         self.state = State(cfg.resolve(cfg.brain.state_file))
-        self.memory = Memory(cfg.resolve(cfg.brain.memory_file), cfg.brain.memory_max_items)
+        self.memory = Memory(cfg.resolve(cfg.brain.memory_file), cfg.brain.memory_max_items, cfg.claude.owner_name)
         self.stt_pool = ThreadPoolExecutor(1, thread_name_prefix="stt")
         self.tts_pool = ThreadPoolExecutor(1, thread_name_prefix="tts")
         self.speaker = Speaker(self.tts, self.robot, self.tts_pool)
@@ -151,6 +151,7 @@ class Brain:
             self.udp_transport, _ = await loop.create_datagram_endpoint(
                 lambda: _Udp(self), local_addr=("0.0.0.0", self.cfg.brain.udp_port))
             log.info("listening for the mic on UDP %d", self.udp_port)
+        self._spawn(self.mind.warm_up())
         self._tasks += [
             loop.create_task(self._utterance_loop(), name="utterances"),
             loop.create_task(self._tick_loop(), name="tick"),
@@ -327,7 +328,7 @@ class Brain:
         self.robot.set_anim("listening", urgent=True)
         deltas = self.mind.reply(
             request, self.conv.messages(), self.context(),
-            session_names=[s.folder for s in self.store.all()],
+            session_names=[s.folder for s in self.store.all()], taught=self.memory.prompt(),
         )
         spoken = await self.speaker.speak_stream(deltas, on_first=self.conv.speaking)
         self.conv.add("user", request)
@@ -523,11 +524,7 @@ class Brain:
     def context(self) -> str:
         now = self.clock()
         auto = self.focus.mode == "auto"
-        lines = []
-        taught = self.memory.prompt()
-        if taught:
-            lines += [taught, ""]
-        lines += [
+        lines = [
             "Focus mode: " + ("auto (you follow the most recently active session)." if auto
                               else "explicit (Joe chose this session)."),
             "Sessions:",

@@ -35,6 +35,13 @@ class OllamaError(Exception):
     pass
 
 
+def _connection(url: str, timeout_s: float) -> http.client.HTTPConnection:
+    """Ollama's default port is 11434, also for https URLs without a port."""
+    u = urlsplit(url)
+    cls = http.client.HTTPSConnection if u.scheme == "https" else http.client.HTTPConnection
+    return cls(u.hostname or "127.0.0.1", u.port or 11434, timeout=timeout_s)
+
+
 def to_ollama_tools(tools: list[dict]) -> list[dict]:
     return [{"type": "function",
              "function": {"name": t["name"], "description": t.get("description", ""),
@@ -83,10 +90,6 @@ def to_ollama_messages(system: str, messages: list[dict]) -> list[dict]:
 class OllamaBackend(LLMBackend):
     def __init__(self, cfg: LocalCfg, connect_timeout_s: float = 1.5, read_timeout_s: float = 60.0):
         self.cfg = cfg
-        u = urlsplit(cfg.url)
-        self.host = u.hostname or "127.0.0.1"
-        self.port = u.port or (443 if u.scheme == "https" else 11434)
-        self.https = u.scheme == "https"
         self.connect_timeout_s = connect_timeout_s
         self.read_timeout_s = read_timeout_s
 
@@ -116,8 +119,7 @@ class OllamaBackend(LLMBackend):
 
         def worker():
             try:
-                cls = http.client.HTTPSConnection if self.https else http.client.HTTPConnection
-                conn = cls(self.host, self.port, timeout=self.connect_timeout_s)
+                conn = _connection(self.cfg.url, self.connect_timeout_s)
                 holder["conn"] = conn
                 conn.connect()
                 conn.sock.settimeout(self.read_timeout_s)
@@ -139,9 +141,13 @@ class OllamaBackend(LLMBackend):
         threading.Thread(target=worker, name="ollama", daemon=True).start()
         text: list[str] = []
         calls: list[dict] = []
+        pinged = False
         try:
             while True:
                 kind, val = await q.get()
+                if kind == "line" and not pinged:
+                    pinged = True
+                    yield ("ping",)  # Ollama has started answering (it may still be writing a tool call)
                 if kind == "exc":
                     raise OllamaError(f"Ollama isn't reachable at {self.cfg.url} ({val})")
                 if kind == "status":
@@ -181,6 +187,31 @@ class OllamaBackend(LLMBackend):
         content += calls
         yield ("final", content, "tool_use" if calls else "end_turn")
 
+    async def warm_up(self) -> None:
+        """Load the model into memory and keep it there (docs/api.md "Load a model":
+        an empty messages array only loads)."""
+        body = json.dumps({"model": self.cfg.model, "messages": [], "keep_alive": self.cfg.keep_alive}).encode()
+
+        def go():
+            conn = _connection(self.cfg.url, self.connect_timeout_s)
+            try:
+                conn.connect()
+                conn.sock.settimeout(300)  # a first load from disk can take a while
+                conn.request("POST", "/api/chat", body=body, headers={"Content-Type": "application/json"})
+                resp = conn.getresponse()
+                raw = resp.read()
+            finally:
+                conn.close()
+            if resp.status != 200:
+                raise self._status_error(self.cfg.model, resp.status, raw)
+
+        try:
+            await asyncio.to_thread(go)
+        except OllamaError:
+            raise
+        except OSError as e:
+            raise OllamaError(f"Ollama isn't reachable at {self.cfg.url} ({e})") from e
+
     def _status_error(self, model: str, status: int, raw: bytes) -> OllamaError:
         try:
             msg = str(json.loads(raw).get("error", ""))
@@ -196,10 +227,8 @@ def local_status(cfg: LocalCfg, timeout_s: float = 2.0) -> str:
     Uses GET /api/tags ("List Local Models" in docs/api.md)."""
     if not cfg.enabled:
         return "off ([local] enabled = false): Claude answers everything"
-    u = urlsplit(cfg.url)
-    cls = http.client.HTTPSConnection if u.scheme == "https" else http.client.HTTPConnection
     try:
-        conn = cls(u.hostname or "127.0.0.1", u.port or 11434, timeout=timeout_s)
+        conn = _connection(cfg.url, timeout_s)
         conn.request("GET", "/api/tags")
         resp = conn.getresponse()
         data = json.loads(resp.read() or b"{}")

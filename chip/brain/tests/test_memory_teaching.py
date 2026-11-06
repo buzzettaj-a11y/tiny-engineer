@@ -103,3 +103,19 @@ def test_mute_request_with_a_mute_switch_tells_joe_to_flip_it(robot, tmp_path):
     assert "flip it to O" in out
     assert "could not" not in out.lower()
     assert robot.muted is False
+
+
+def test_forget_only_removes_the_thing_joe_meant(robot, tmp_path):
+    brain = Brain(make_cfg(robot, tmp_path), transcriber=FakeTranscriber(lambda s, i: ""), tts=FakeTTS(),
+                  llm=None, wake_detector=None)
+
+    async def go():
+        await brain.run_tool("remember", {"fact": "Joe likes one-sentence updates"})
+        await brain.run_tool("remember", {"fact": "Joe likes coffee at 9"})
+        out = await brain.run_tool("forget", {"about": "Joe likes coffee"})
+        assert "coffee" in out and "one-sentence" not in out
+        assert "Nothing" in await brain.run_tool("forget", {"about": "Joe likes"})
+
+    asyncio.run(go())
+    assert "one-sentence updates" in brain.memory.prompt()
+    assert "coffee" not in brain.memory.prompt()

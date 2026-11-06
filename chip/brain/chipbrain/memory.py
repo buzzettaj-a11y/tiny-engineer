@@ -19,10 +19,20 @@ def _norm(text: str) -> str:
     return " ".join(re.findall(r"[a-z0-9']+", text.lower()))
 
 
+# Words that say nothing about WHICH fact is meant ("forget that Joe likes coffee").
+FILLER = {
+    "a", "an", "the", "and", "or", "to", "of", "in", "on", "at", "for", "with", "about", "that", "this",
+    "it", "its", "is", "are", "be", "was", "i", "me", "my", "you", "your", "he", "him", "his", "we",
+    "like", "likes", "liked", "want", "wants", "thing", "things", "stuff", "remember", "forget", "please",
+    "always", "never", "from", "now", "should",
+}
+
+
 class Memory:
-    def __init__(self, path: Path, max_items: int = 50):
+    def __init__(self, path: Path, max_items: int = 50, owner: str = "Joe"):
         self.path = Path(path)
         self.max_items = max_items
+        self.owner = owner
         self.facts: list[dict] = []
         self._load()
 
@@ -50,19 +60,21 @@ class Memory:
             return "I already remember that."
         if len(self.facts) >= self.max_items:
             return (f"My memory is full ({self.max_items} things). "
-                    "Ask Joe what to forget first.")
+                    f"Ask {self.owner} what to forget first.")
         self.facts.append({"fact": fact, "added": time.strftime("%Y-%m-%d")})
         self._save()
         log.info("remembered: %s", fact)
         return f"Remembered: {fact}"
 
     def forget(self, about: str) -> str:
-        words = set(_norm(about).split())
+        """Forget the facts that contain every meaningful word of ``about``."""
+        filler = FILLER | {self.owner.lower()}
+        words = {w for w in _norm(about).split() if w not in filler}
         if not words:
-            return "Nothing matched."
+            return "Nothing I remember matches that. Say which thing to forget."
         keep, gone = [], []
         for f in self.facts:
-            (gone if words & set(_norm(f["fact"]).split()) else keep).append(f)
+            (gone if words <= set(_norm(f["fact"]).split()) else keep).append(f)
         if not gone:
             return "Nothing I remember matches that."
         self.facts = keep
@@ -73,4 +85,4 @@ class Memory:
     def prompt(self) -> str:
         if not self.facts:
             return ""
-        return "Things Joe has taught you (follow these):\n" + "\n".join(f"- {f['fact']}" for f in self.facts)
+        return f"Things {self.owner} has taught you (follow these):\n" + "\n".join(f"- {f['fact']}" for f in self.facts)

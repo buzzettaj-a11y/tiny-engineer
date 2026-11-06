@@ -312,6 +312,7 @@ def test_idle_glance_only_when_robot_is_idle(robot, tmp_path):
         cfg = make_cfg(robot, tmp_path)
         cfg.idle.enabled = True
         brain = Brain(cfg, transcriber=FakeTranscriber(lambda s, i: ""), tts=FakeTTS(), llm=None, wake_detector=None)
+        brain.idle.hour = lambda: 12  # midday: at night Chip skips half its glances on purpose
         await brain.start()
         try:
             brain.idle.next_glance_at = 0

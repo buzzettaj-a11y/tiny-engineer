@@ -58,7 +58,8 @@ enabled = true
 url = "http://127.0.0.1:11434"
 model = "qwen3:4b"               # any Ollama model with tool support; run: ollama pull qwen3:4b
 first_token_timeout_s = 3.0      # local model must start answering within this, else Claude answers
-keep_alive = "30m"               # keep the model loaded between conversations
+retry_after_s = 300.0            # after the local model stalls or fails, Claude answers alone for this long
+keep_alive = "-1m"               # keep the model loaded; negative = never unload ("30m" frees memory sooner)
 num_ctx = 8192                   # context window (Ollama's default is too small)
 max_tokens = 200
 temperature = 0.7

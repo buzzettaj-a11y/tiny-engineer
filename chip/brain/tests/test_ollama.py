@@ -139,3 +139,31 @@ def test_check_reports_whether_ollama_runs_and_has_chips_model():
         srv.stop()
     assert "not running" in local_status(_cfg("http://127.0.0.1:9"))
     assert "off" in local_status(LocalCfg(enabled=False))
+
+
+def test_a_slow_tool_call_still_counts_as_answering_once_ollama_starts_streaming(ollama):
+    srv = ollama([[{"message": {"role": "assistant", "content": ""}, "done": False}, {"sleep": 0.8}]
+                  + ollama_tool("ask_claude", {"question": "why?"})])
+    claude = FakeLLM([{"text": ["Because."]}])
+
+    async def noop(name, inp):
+        return "ok"
+
+    mind = Mind(_cfg(srv.url, first_token_timeout_s=0.4), ClaudeCfg(), OllamaBackend(_cfg(srv.url)), claude, noop)
+
+    async def say():
+        return "".join([d async for d in mind.reply("why?", [], "")])
+
+    assert asyncio.run(say()) == "Let me ask Claude. Because."
+    assert mind.last_engine == "hand-off"
+
+
+def test_warm_up_loads_the_model_and_keeps_it_loaded(ollama):
+    srv = ollama([[{"message": {"role": "assistant", "content": ""}, "done": True, "done_reason": "load"}]])
+    asyncio.run(OllamaBackend(_cfg(srv.url, keep_alive="-1m")).warm_up())
+    body = srv.requests[0]["body"]
+    assert body["messages"] == [] and body["model"] == "qwen3:4b" and body["keep_alive"] == "-1m"
+
+
+def test_default_keeps_the_model_loaded_forever():
+    assert LocalCfg().keep_alive == "-1m"
